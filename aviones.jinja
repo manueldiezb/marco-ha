@@ -1,0 +1,381 @@
+{# Devuelve JSON {modelo, frase, candidatos}. ponytail: altura de casa fija (694 m), Barajas 610 m y umbral de 13 km a ojo; ajustar si no cuadra con lo que se oye. #}
+{% macro nombre_modelo(f) -%}
+  {%- set code = f.aircraft_code or '' -%}
+  {%- set base = (f.aircraft_model or code or 'Avión') | regex_replace('-[0-9A-Z]+(\\([A-Z]+\\))?$', '') -%}
+  {%- if code is match('^A[0-9]{2}N$') and 'neo' not in base | lower -%}{%- set base = base ~ 'neo' -%}{%- endif -%}
+  {%- if code is match('^B3[0-9]M$') and 'MAX' not in base -%}{%- set base = base ~ ' MAX' -%}{%- endif -%}
+  {{- base -}}
+{%- endmacro %}
+{% macro num(x) -%}{{ (x | int if x == x | int else x) | string | replace('.', ',') }}{%- endmacro %}
+{#- Pista de Barajas por la que despega (o iba a aterrizar): la de rumbo parecido (±25°) cuyo eje pasa a menos de 600 m
+    del avión (las paralelas están a ~1,3 km) y a menos de 15 km del centro de la pista. Si ya ha virado, '' (no se sabe).
+    Coordenadas de OurAirports (umbrales de LEMD); plano local en km alrededor de 40,5 N (1° lon = 84,65 km). -#}
+{#- max_km: 15 en general; 25 en los go-arounds para que «Aproximando» salga al alinearse en la final larga (15-20 km del umbral) -#}
+{#- sobre=true: la pista sobre la que está (a < 100 m del eje, en su longitud, cualquier rumbo) como '14L/32R'; para ver si está ocupada -#}
+{#- llegando=true: solo si está antes del umbral en su sentido de marcha (viene hacia la pista; tras frustrar se aleja de ella) -#}
+{% macro pista(f, max_km=15, sobre=false, llegando=false) -%}
+  {%- set ns = namespace(id='', d=99) -%}
+  {%- if f.latitude is number and f.longitude is number and f.heading is number -%}
+    {%- set px, py = (f.longitude + 3.56) * 84.65, (f.latitude - 40.5) * 111.13 -%}
+    {%- for a, b, la, ha, lb, hb in [((40.4949, -3.55787), (40.4700, -3.53258), '14L', 144, '32R', 324),
+                                      ((40.4849, -3.57601), (40.4557, -3.54638), '14R', 144, '32L', 324),
+                                      ((40.5326, -3.55938), (40.5011, -3.55921), '18L', 181, '36R', 1),
+                                      ((40.5318, -3.57485), (40.4926, -3.57463), '18R', 181, '36L', 2)] -%}
+      {%- set ax, ay, bx, by = (a[1] + 3.56) * 84.65, (a[0] - 40.5) * 111.13, (b[1] + 3.56) * 84.65, (b[0] - 40.5) * 111.13 -%}
+      {%- set n = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5 -%}
+      {%- set ux, uy = (bx - ax) / n, (by - ay) / n -%}
+      {%- set lat = ((px - ax) * uy - (py - ay) * ux) | abs -%}
+      {%- set s = (px - (ax + bx) / 2) * ux + (py - (ay + by) / 2) * uy -%}
+      {%- set lon = s | abs -%}
+      {%- if sobre -%}
+        {%- if lat < 0.1 and lon < n / 2 + 0.1 -%}{%- set ns.id = la ~ '/' ~ lb -%}{%- endif -%}
+      {%- else -%}
+      {#- la (14L, 18L…) se recorre de a hacia b; lb al revés -#}
+      {%- for ident, rh, sg in [(la, ha, 1), (lb, hb, -1)] -%}
+        {#- margen a cada lado del eje: 600 m (las paralelas están a ~1,3 km); lejos de la pista crece un 3 % (~1,7°, como el localizador) -#}
+        {%- if ((f.heading - rh + 540) % 360 - 180) | abs < 25 and lat < [0.6, (lon - n / 2) * 0.03] | max and lat < ns.d and lon < max_km and (not llegando or sg * s < -n / 2) -%}{%- set ns.id, ns.d = ident, lat -%}{%- endif -%}
+      {%- endfor -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {{- ns.id -}}
+{%- endmacro %}
+{#- Motivo probable de un go-around, en el momento de detectarlo (pedido del usuario, 2026-11-01). Causas más frecuentes según
+    EUROCONTROL: pista ocupada (el anterior aún en ella o un despegue), muy cerca del de delante, viento/cizalladura y visibilidad.
+    No se ve: aproximación inestable, averías, aves u órdenes de la torre -> «Desconocido». metar = atributos de sensor.metar_lemd -#}
+{% macro motivo_ga(f, flights, metar) -%}
+  {%- set pg = pista(f, 25) -%}
+  {%- set m = namespace(l=[], delante=none, dd=99) -%}
+  {%- set arp = (40.472, -3.561) -%}
+  {%- set df = (((f.longitude - arp[1]) * 84.65) ** 2 + ((f.latitude - arp[0]) * 111.13) ** 2) ** 0.5 if f.latitude is number else 99 -%}
+  {%- for o in flights or [] if o.id != f.id and o.latitude is number and o.longitude is number -%}
+    {%- set nom = o.flight_number or o.callsign or o.aircraft_code or 'otro avión' -%}
+    {%- if pg and (o.on_ground or 0) | int(0) == 1 and pg in pista(o, sobre=true).split('/') -%}
+      {%- set m.l = m.l + ['Pista ocupada: ' ~ nom ~ (' aterrizando' if o.airport_destination_code_iata == 'MAD' else ' despegando' if o.airport_origin_code_iata == 'MAD' else '')] -%}
+    {%- elif pg and (o.on_ground or 0) | int(0) == 0 and o.airport_destination_code_iata == 'MAD' and pista(o, 25) == pg -%}
+      {%- set d = (((o.longitude - f.longitude) * 84.65) ** 2 + ((o.latitude - f.latitude) * 111.13) ** 2) ** 0.5 -%}
+      {%- set dob = (((o.longitude - arp[1]) * 84.65) ** 2 + ((o.latitude - arp[0]) * 111.13) ** 2) ** 0.5 -%}
+      {#- el de delante: más cerca del aeropuerto que el que frustra; a menos de 5 km (unas 2,7 NM) es muy poco -#}
+      {%- if dob < df and d < 5 and d < m.dd -%}{%- set m.delante, m.dd = nom, d -%}{%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if m.delante -%}{%- set m.l = m.l + ['Muy cerca del ' ~ m.delante ~ ' (' ~ (m.dd | round(1) | string).replace('.', ',') ~ ' km)'] -%}{%- endif -%}
+  {%- if metar -%}
+    {%- set raw = (metar.get('rawOb') or '') ~ ' ' -%}
+    {%- set rh = {'14': 144, '32': 324, '18': 181, '36': 1}.get(pg[:2]) if pg else none -%}
+    {%- set v, r = (metar.get('wspd') or 0) | int(0), (metar.get('wgst') or 0) | int(0) -%}
+    {%- if rh is not none and metar.get('wdir') is number -%}
+      {%- set cola = -(v * cos((metar.get('wdir') - rh) * pi / 180)) -%}
+      {%- set cruz = (v * sin((metar.get('wdir') - rh) * pi / 180)) | abs -%}
+      {%- if cola >= 5 -%}{%- set m.l = m.l + ['Viento de cola de ' ~ cola | round(0) | int ~ ' kt'] -%}{%- endif -%}
+      {%- if cruz >= 20 -%}{%- set m.l = m.l + ['Viento cruzado de ' ~ cruz | round(0) | int ~ ' kt'] -%}{%- endif -%}
+    {%- endif -%}
+    {%- if r >= 20 or (r and r - v >= 10) -%}{%- set m.l = m.l + ['Rachas de ' ~ r ~ ' kt'] -%}{%- endif -%}
+    {%- if ' WS ' in raw or 'WS R' in raw -%}{%- set m.l = m.l + ['Cizalladura avisada'] -%}{%- endif -%}
+    {%- if raw is search(' (\\+|-)?TS') -%}{%- set m.l = m.l + ['Tormenta'] -%}{%- endif -%}
+    {%- if ' FG ' in raw or (metar.get('visib') is number and metar.get('visib') < 1) -%}{%- set m.l = m.l + ['Niebla o poca visibilidad'] -%}{%- endif -%}
+  {%- endif -%}
+  {{- m.l | join(' · ') or 'Desconocido' -}}
+{%- endmacro %}
+{% macro avion_cercano(flights, casa_m=694, suelo_m=610, max_km=13, aviso_km=20, pistas=['36L', '14R', '18R'], pistas_sec=['36R', '14L'], sobre_km=3, salida_km=5, salida_grande_km=8, grandes='^(A30|A310|A3[3-8]|B7[4-8]|MD11|IL96|A124|A400|C17)', ahora=none,
+    rodaje={'36L T1': 21, '36L T2': 20, '36L T3': 18, '36L T4': 17, '36L T4S': 14,
+            '18R T1': 31, '18R T2': 30, '18R T3': 28, '18R T4': 24, '18R T4S': 24,
+            '14L T1': 22, '14L T2': 21, '14L T3': 19, '14L T4': 21, '14L T4S': 14,
+            '14R T1': 18, '14R T2': 17, '14R T3': 15, '14R T4': 18, '14R T4S': 15}, rodaje_def=18, ga_prev=[], seguidos=[], motivo_prev=none, metar=none, desvio_prev=none, desvio_s=300, desvio_km=100) -%}
+{#- rodaje (min, de la puerta al despegue): mediana de EUROCONTROL para Barajas en verano de 2025 (18 min; el 80 % entre 13 y 25)
+    repartida por la distancia de cada terminal a la cabecera (centros medidos con FR24, x1,25 por el trazado, 18 kt de media).
+    14L/14R (configuración sur, 2026-11-12): misma regla, ~2,3 min por km extra respecto a la cabecera de la 36L.
+    ponytail: estimado, no medido; si una terminal no cuadra, se toca aquí. Sin terminal o pista conocida, 18 -#}
+  {#- seguidos: los vuelos que FR24 sigue fuera del área (sensor.flightradar24_rastreados_adicionales). Solo cuentan los go-arounds
+      ya marcados: la automatización avion_ga_seguir los añade al frustrar, así la tarjeta sigue con datos aunque se alejen (FR2064, 01-11) -#}
+  {%- set en_area = (flights or []) | map(attribute='id') | list -%}
+  {%- set flights = (flights or []) + ((seguidos or []) | selectattr('id', 'in', ga_prev) | rejectattr('id', 'in', en_area) | list) -%}
+  {%- set ns = namespace(l=[]) -%}
+  {%- for f in flights or [] -%}
+    {%- set suelo = (f.on_ground or 0) | int(0) == 1 -%}
+    {#- solo lo que interesa (lo pidió el usuario): despegues por la 36L, la 14R (configuración sur) o la 18R (las pistas del lado de casa; la de la pista
+        sale del rumbo y la posición, así que tras virar ya no cuenta como despegue), go-arounds (iba a Barajas y sube) y
+        cualquier avión que pase por encima: a menos de sobre_km en horizontal, a cualquier altura -#}
+    {%- set vs0 = (f.vertical_speed or 0) | int(0) -%}
+    {%- set cuatro_vientos = 'QYU' in [f.airport_origin_code_iata, f.airport_destination_code_iata] or 'LECU' in [f.airport_origin_code_icao, f.airport_destination_code_icao] -%}
+    {#- fuera también los vehículos de tierra del aeropuerto (FAUNA1 y compañía, modelo GRND): corren por la pista y parecían despegues -#}
+    {#- y los que FR24 no clasifica: en tierra sin modelo ni destino (B7, 10-11, 46 kt por la 36L); un avión de verdad lleva al menos el destino -#}
+    {%- set cuatro_vientos = cuatro_vientos or f.aircraft_code == 'GRND' or 'Ground Vehicle' in (f.aircraft_model or '')
+        or (suelo and not f.aircraft_code and not f.airport_destination_code_iata) -%}
+    {%- set saliendo = f.airport_origin_code_iata == 'MAD' and ((suelo and (f.ground_speed or 0) | int(0) > 40) or (not suelo and vs0 >= 0)) -%}
+    {%- set despegue = saliendo and pista(f) in pistas -%}
+    {#- secundarios: despegues por la 36R o la 14L, solo si no hay nada de lo anterior (el Marco no salta a la tarjeta por ellos) -#}
+    {%- set sec = saliendo and pista(f) in pistas_sec -%}
+    {#- go-around: iba a Barajas y sube de verdad (≥ 500 ft/min) con potencia (≥ 130 kt) o ya por encima de 3000 ft (en configuración
+        sur, con viento de cara, la velocidad sobre el suelo se queda en 115-125 kt: VLG30VT, 26-10). Al tomar tierra FR24 marca
+        +64/+128 ft/min a 70-146 kt y ~1600-1700 ft, de ahí los mínimos. Una vez marcado (ga_prev: lo guarda el sensor) sigue siéndolo mientras vuele dentro del radio -#}
+    {#- o cruza Barajas por encima sin bajar: dentro del recinto de pistas, alineado con una, a 3500-6500 ft y sin descender (VLG30VT,
+        26-10: frustró a 15-20 km, fuera del radio, y pasó sobre la 32 a 5700 ft nivelado antes de dar la vuelta) -#}
+    {%- set alt_ft = (f.altitude or 0) | int(0) -%}
+    {#- solo con rumbo de llegada (32 o 18): con el de las pistas de despegue (36 o 14) es un despegue -#}
+    {%- set sobre_mad = f.latitude is number and f.longitude is number and f.heading is number
+        and 40.450 <= f.latitude <= 40.537 and -3.583 <= f.longitude <= -3.526 and 3500 <= alt_ft <= 6500 and vs0 >= -300
+        and ([((f.heading - 324 + 540) % 360 - 180) | abs, ((f.heading - 181 + 540) % 360 - 180) | abs] | min) < 25 -%}
+    {#- falsos go-arounds (revisión del 2026-11-09): (1) despegues de la 36L/36R con el vuelo ANTERIOR en FR24 (EQE906 CLE→MAD, H5357,
+        AJD019T: segundos después ya eran MAD→FAO…) y vuelos MAD→MAD (IBS901P) -> solo cuenta subiendo alineado con una pista de
+        llegada (32L/32R/18L/18R), sin salir de MAD y sin aterrizaje real ya registrado; (2) un repunte de +576 ft/min en la final
+        (GES121L) -> ≥ 1000 ft/min (los de verdad: 1150-2900); (3) una llegada que ATC sube a 9000 ft lejos de la pista (VL1800) -> sin pista no -#}
+    {%- set ya_llego = f.time_real_arrival is number and f.time_real_arrival > 0 and (ahora or now().timestamp()) - f.time_real_arrival > 300 -%}
+    {%- set sube_ga = vs0 >= 1000 and ((f.ground_speed or 0) | int(0) >= 130 or alt_ft >= 3000) and pista(f, 25) in ['32L', '32R', '18L', '18R'] -%}
+    {#- ya marcado sigue también rodando en pista tras tomar tierra (> 40 kt), para el tramo «En tierra» de la Live Activity 
+        Si cambia de destino (desvío a otro aeropuerto) deja de serlo -#}
+    {%- set frustrada = (f.id in ga_prev and f.airport_destination_code_iata == 'MAD' and (f.distance or 0) | float(0) <= desvio_km and (not suelo or (f.ground_speed or 0) | int(0) > 40)) or (not suelo and f.airport_destination_code_iata == 'MAD'
+        and f.airport_origin_code_iata != 'MAD' and not ya_llego and (sobre_mad or sube_ga)) -%}
+    {#- aviones grandes (fuselaje ancho) frenando en la 32L: las reversas se oyen desde casa -#}
+    {%- set reversas = suelo and f.airport_destination_code_iata == 'MAD' and (f.ground_speed or 0) | int(0) > 40
+        and (f.aircraft_code or '') is match(grandes) and pista(f) == '32L' -%}
+    {%- set sobrevuelo = not suelo and (f.distance or 99) | float(99) <= sobre_km -%}
+    {#- salidas de Barajas subiendo cerca de casa, por cualquier pista: 8 km si es grande (fuselaje ancho), 5 km los demás -#}
+    {%- set sobre_salida = saliendo and not suelo
+        and (f.distance or 99) | float(99) <= (salida_grande_km if (f.aircraft_code or '') is match(grandes) else salida_km) -%}
+    {%- set sobrevuelo = sobrevuelo or sobre_salida -%}
+    {%- if not cuatro_vientos and (despegue or frustrada or sobrevuelo or reversas or sec) -%}
+      {%- set h = 0 if suelo else [0, (f.altitude or 0) | float(0) * 0.3048 - casa_m] | max -%}
+      {%- set d = (f.distance or 99) | float(99) -%}
+      {%- set r = (d ** 2 + (h / 1000) ** 2) ** 0.5 -%}
+      {%- set alt = 0 if suelo else [0, (f.altitude or 0) | float(0) * 0.3048 - suelo_m] | max -%}
+      {%- set ns.l = ns.l + [dict(f=f, h=h, d=d, r=r if not (sobrevuelo or frustrada) else [r, max_km] | min, alt=alt, ga=frustrada, sec=sec and not (despegue or frustrada or sobrevuelo or reversas))] -%}   {#- un sobrevuelo o un go-around cuentan aunque estén lejos o altos -#}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- set todos = ns.l | sort(attribute='r') -%}
+  {%- set sub = namespace(l=[]) -%}
+  {%- for f in flights or [] if (f.on_ground or 0) | int(0) == 0 and f.airport_destination_code_iata == 'MAD' and (f.vertical_speed or 0) | int(0) > 0 -%}
+    {%- set sub.l = sub.l + [(f.callsign or '?') ~ ' ' ~ f.vertical_speed ~ 'fpm ' ~ f.ground_speed ~ 'kt ' ~ f.altitude ~ 'ft ' ~ ((f.distance or 0) | round(1)) ~ 'km'] -%}
+  {%- endfor -%}
+  {#- candidatos: los 3 más cercanos aunque no se oigan, para poder ajustar max_km con datos reales -#}
+  {%- set cand = namespace(l=[]) -%}
+  {%- for c in todos[:3] -%}{%- set cand.l = cand.l + [(c.f.callsign or '?') ~ ' ' ~ (c.r | round(1)) ~ ' km'] -%}{%- endfor -%}
+  {%- set ga = todos | selectattr('ga') | list -%}
+  {#- go-arounds marcados ahora. Fuera del área los mantiene el seguimiento de FR24 (seguidos, avion_ga_seguir); un id que no está
+      ni en el área ni seguido se olvida: antes se recordaba siempre y los falsos de despegue (H5357, AJD019T) se quedaban para siempre -#}
+  {%- set ga_ids = ga | map(attribute='f') | map(attribute='id') | select | list -%}
+  {#- motivo: se calcula una vez al marcar el go-around y se conserva mientras siga marcado (aunque salga del área) -#}
+  {%- set mot_prev = motivo_prev if motivo_prev is mapping and motivo_prev.id in ga_ids else none -%}
+  {#- desvío (18-11, IB1334 frustró y se fue a VLC): un go-around marcado que cambia de destino deja de serlo (frustrada exige MAD);
+      se avisa desvio_s segundos (5 min) con una foto fija del vuelo, que pintan el Marco, avion-card y la Live Activity (avion_desvio) -#}
+  {%- set t_ = ahora or now().timestamp() -%}
+  {%- set dv = namespace(d=desvio_prev if desvio_prev is mapping and t_ - (desvio_prev.t or 0) < desvio_s else none) -%}
+  {#- FR24 NO cambia el destino al desviarse (IB1334 seguía «→ MAD» bajando a 280 km sobre Valencia): también es desvío alejarse más de
+      desvio_km de casa (las esperas de Barajas quedan más cerca). Destino: el de FR24 si ya no es MAD; si no, el aeropuerto que tiene
+      delante (±30° del rumbo) más cercano. ponytail: lista corta de alternativos de Barajas; si sale uno que falta, se añade aquí -#}
+  {%- for f in flights if f.id and f.id in ga_prev and ((f.airport_destination_code_iata and f.airport_destination_code_iata != 'MAD') or (f.distance or 0) | float(0) > desvio_km) -%}
+    {%- set alt = namespace(a=f.airport_destination_code_iata if f.airport_destination_code_iata != 'MAD' else '', c=f.airport_destination_city if f.airport_destination_code_iata != 'MAD' else '', d=9999) -%}
+    {%- if not alt.a and f.latitude is number and f.longitude is number and f.heading is number -%}
+      {%- for k, ap in {'VLC': [39.489, -0.482, 'Valencia'], 'ALC': [38.282, -0.558, 'Alicante'], 'ZAZ': [41.666, -1.042, 'Zaragoza'], 'BCN': [41.297, 2.079, 'Barcelona'],
+          'PMI': [39.552, 2.739, 'Palma'], 'AGP': [36.675, -4.499, 'Málaga'], 'SVQ': [37.418, -5.893, 'Sevilla'], 'BIO': [43.301, -2.911, 'Bilbao'],
+          'VLL': [41.706, -4.852, 'Valladolid'], 'SCQ': [42.896, -8.415, 'Santiago'], 'OPO': [41.248, -8.681, 'Oporto'], 'LIS': [38.774, -9.134, 'Lisboa']}.items() -%}
+        {%- set dx, dy = (ap[1] - f.longitude) * 111.32 * cos(f.latitude * pi / 180), (ap[0] - f.latitude) * 111.32 -%}
+        {%- set d = (dx ** 2 + dy ** 2) ** 0.5 -%}
+        {%- if d < alt.d and (d < 15 or (dx * sin(f.heading * pi / 180) + dy * cos(f.heading * pi / 180)) / d > 0.866) -%}
+          {%- set alt.a, alt.c, alt.d = k, ap[2], d -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+    {%- set dv.d = dict(id=f.id, t=t_ | int, modelo=nombre_modelo(f), aerolinea=f.airline_short or f.airline or '', iata=f.airline_iata or '', icao=f.airline_icao or '',
+        vuelo=f.flight_number or f.callsign or '', tipo=f.aircraft_code or '', origen=f.airport_origin_city or f.airport_origin_code_iata or '',
+        destino=alt.c or alt.a, a=alt.a,
+        fr24=('https://www.flightradar24.com/' ~ (f.callsign or f.flight_number) ~ '/' ~ f.id) if f.callsign or f.flight_number else '',
+        motivo=motivo_prev.texto if motivo_prev is mapping and motivo_prev.id == f.id and motivo_prev.texto != 'Desconocido' else '') -%}
+  {%- endfor -%}
+  {%- set cerca = todos | selectattr('r', 'le', max_km) | list -%}
+  {%- set l = ga if ga else (cerca | rejectattr('sec') | list) or cerca -%}   {#- un go-around manda sobre todo; los de la 36R/14L, solo si no hay otro -#}
+  {%- if not l and todos and todos[0].r <= aviso_km -%}
+    {%- set c = todos[0] -%}
+    {{- dict(modelo='ninguno', frase='No hay ninguno muy cerca. El más próximo es un ' ~ nombre_modelo(c.f) ~ (' de ' ~ c.f.airline_short if c.f.airline_short else '') ~ ', a ' ~ num(c.d | round(1)) ~ ' kilómetros de casa.', candidatos=cand.l, ga=ga_ids, motivo=mot_prev, desvio=dv.d, subiendo=sub.l) | to_json -}}
+  {%- elif not l -%}
+    {{- dict(modelo='ninguno', frase='No veo ningún avión cerca de casa ahora mismo.', candidatos=cand.l, ga=ga_ids, motivo=mot_prev, desvio=dv.d, subiendo=sub.l) | to_json -}}
+  {%- else -%}
+    {%- set a = l[0] -%}{%- set f = a.f -%}
+    {%- set mot = (mot_prev.texto if mot_prev and mot_prev.id == f.id else motivo_ga(f, flights, metar)) if a.ga else none -%}
+    {%- set vs = (f.vertical_speed or 0) | int(0) -%}
+    {#- FR24 quita on_ground ya rodando (~120 kt) y da la altitud de presión de Barajas (~1800 ft) con vs 0: AR1133, 30-10.
+        Una salida de MAD sin subir y por debajo de 2500 ft sigue en la pista -#}
+    {%- set rodando = (f.on_ground or 0) | int(0) == 1 or (f.airport_origin_code_iata == 'MAD' and vs <= 0 and (f.altitude or 0) | int(0) < 2500) -%}
+    {%- set fase = 'haciendo un go-around, un aterrizaje frustrado en Barajas' if a.ga
+      else 'despegando de Barajas' if rodando and f.airport_origin_code_iata == 'MAD'
+      else 'aterrizando en Barajas por la 32L' if (f.on_ground or 0) | int(0) == 1 and f.airport_destination_code_iata == 'MAD'
+      else 'que acaba de despegar de Barajas' if f.airport_origin_code_iata == 'MAD' and a.h < 2500 and vs >= 0
+      else '' -%}
+    {%- set ruta = ('de ' ~ (f.airport_origin_city or f.airport_origin_code_iata) ~ ' a ' ~ (f.airport_destination_city or f.airport_destination_code_iata))
+      if (f.airport_origin_city or f.airport_origin_code_iata) and (f.airport_destination_city or f.airport_destination_code_iata) else '' -%}
+    {%- set frase = nombre_modelo(f) ~ (' de ' ~ f.airline_short if f.airline_short else '')
+      ~ (', ' ~ fase if fase else '') ~ '. ' ~ ('Vuelo ' ~ (f.flight_number or f.callsign) ~ ' ' if (f.flight_number or f.callsign) else '')
+      ~ ruta ~ '. Está a ' ~ ((((a.alt / 0.3048 / 100) | round(0) * 100) | int ~ ' pies de altura y a ') if a.alt >= 100 else '') ~ num(a.d | round(1)) ~ ' kilómetros de casa.' -%}
+    {%- if l | count > 1 and l[1].r - a.r < 1.5 -%}
+      {%- set frase = frase ~ ' Cerca también hay un ' ~ nombre_modelo(l[1].f) ~ (' de ' ~ l[1].f.airline_short if l[1].f.airline_short else '') ~ '.' -%}
+    {%- endif -%}
+    {#- para la tarjeta del Marco. fase: despegue = en pista (carrera), frustrada = iba a Barajas y sube (go-around), vuelo = el resto -#}
+    {%- set fase_i = 'aterrizaje' if (f.on_ground or 0) | int(0) == 1 and f.airport_destination_code_iata == 'MAD'
+      else 'despegue' if rodando else 'frustrada' if a.ga else 'vuelo' -%}
+    {#- retraso en minutos. Salidas de Barajas: la hora programada es la de la puerta, no la del despegue, así que el despegue
+        previsto = programada + rodaje de su terminal a su pista; el despegue real ≈ ahora (el avión que se enseña está
+        despegando o acaba de hacerlo: error de 1-3 min). Llegadas: llegada estimada contra la prevista. 0 = sin dato en FR24 -#}
+    {%- set sa, ea = f.time_scheduled_arrival or 0, f.time_estimated_arrival or f.time_real_arrival or 0 -%}
+    {%- set sd = f.time_scheduled_departure or 0 -%}
+    {%- set rod = rodaje.get(pista(f) ~ ' T' ~ (f.airport_origin_terminal or '?'), rodaje_def) -%}
+    {%- set retraso = (((ahora or now().timestamp()) - sd) / 60 - rod) | round(0) | int if f.airport_origin_code_iata == 'MAD' and sd
+      else ((ea - sa) / 60) | round(0) | int if sa and ea else none -%}
+    {%- set info = dict(modelo=nombre_modelo(f), grande=(f.aircraft_code or "") is match(grandes), aerolinea=f.airline_short or f.airline or '', iata=f.airline_iata or '', icao=f.airline_icao or '', vuelo=f.flight_number or f.callsign or '', fr24=('https://www.flightradar24.com/' ~ (f.callsign or f.flight_number) ~ '/' ~ f.id) if f.id and (f.callsign or f.flight_number) else '',
+        tipo=f.aircraft_code or '', de=f.airport_origin_code_iata or '', a=f.airport_destination_code_iata or '', origen=f.airport_origin_city or f.airport_origin_code_iata or '', destino=f.airport_destination_city or f.airport_destination_code_iata or '',
+        fase=fase_i, retraso=retraso, rodaje=rod if f.airport_origin_code_iata == 'MAD' else none, alt=((a.alt / 100) | round(0) * 100) | int, km=a.d | round(1), vs=vs,
+        ft=0 if rodando else (f.altitude or 0) | int(0), m=0 if rodando else ((f.altitude or 0) | float(0) * 0.3048) | round(0) | int,
+        kt=(f.ground_speed or 0) | int(0), kmh=((f.ground_speed or 0) | float(0) * 1.852) | round(0) | int,
+        pista=pista(f, 25) if fase_i == 'frustrada' else pista(f) if fase_i == 'aterrizaje' or f.airport_origin_code_iata == 'MAD' else '',
+        alineada=pista(f, 40, llegando=true) if fase_i == 'frustrada' else '', indicativo=f.callsign or '', matricula=f.aircraft_registration or '') -%}
+    {{- dict(modelo=nombre_modelo(f), frase=frase | replace(' .', '.') | replace('. .', '.'),
+        candidatos=cand.l, info=dict(info, secundario=a.sec, motivo=mot), ga=ga_ids, motivo=dict(id=f.id or none, texto=mot) if a.ga else mot_prev, desvio=dv.d, subiendo=sub.l) | to_json -}}
+  {%- endif -%}
+{%- endmacro %}
+{#- Vuelos que sigue la familia: input_text.vuelos_seguidos = 'IB6830 2026-11-20 Papá; UX1093/EC-MQP 2026-11-22'.
+    lista_vuelos(s) → JSON [{n, d, q, m}] (número en mayúsculas, fecha, quién y la matrícula puesta a mano tras «/», por si
+    AeroDataBox aún no la sabe). La usan la automatización vuelos_seguidos y vuelo_seguido. -#}
+{% macro lista_vuelos(s) -%}
+  {%- set ns = namespace(l=[]) -%}
+  {%- for e in (s if s not in ['unknown', 'unavailable', none] else '').split(';') if e.strip() -%}
+    {%- set p = e.strip().split(' ', 2) -%}{%- set nm = (p[0] | upper).split('/') -%}
+    {%- set ns.l = ns.l + [dict(n=nm[0], m=nm[1] if nm | count > 1 else '', d=p[1] if p | count > 1 else '', q=p[2] | trim if p | count > 2 else '')] -%}
+  {%- endfor -%}
+  {{- ns.l | to_json -}}
+{%- endmacro %}
+{#- La tarjeta «Vuelo seguido»: los de la lista que FR24 ya ve en directo (rastreados adicionales, tracked_type live), salvo los
+    go-arounds (ga), que son de la tarjeta Avión. Horas como timestamps: el progreso y lo que queda los calcula la tarjeta. -#}
+{% macro vuelo_seguido(seguidos, s, ga=[]) -%}
+  {%- set ns = namespace(l=[]) -%}
+  {%- for e in lista_vuelos(s) | from_json -%}
+    {#- el mismo vuelo dado de alta dos veces (p. ej. hoy y mañana) sale una vez -#}
+    {%- for f in seguidos or [] if f.tracked_type == 'live' and f.id not in ga and e.n in [f.flight_number, f.callsign] and f.id not in ns.l | map(attribute='id') | list -%}
+      {%- set sa, ea = f.time_scheduled_arrival or 0, f.time_estimated_arrival or f.time_real_arrival or 0 -%}
+      {%- set ns.l = ns.l + [dict(id=f.id, vuelo=e.n, quien=e.q, modelo=nombre_modelo(f), tipo=f.aircraft_code or '', aerolinea=f.airline_short or f.airline or '',
+          iata=f.airline_iata or '', icao=f.airline_icao or '', de=f.airport_origin_code_iata or '', a=f.airport_destination_code_iata or '',
+          origen=f.airport_origin_city or f.airport_origin_code_iata or '', destino=f.airport_destination_city or f.airport_destination_code_iata or '',
+          sale=f.time_real_departure or f.time_estimated_departure or f.time_scheduled_departure or 0, llega=ea or sa,
+          retraso=((ea - sa) / 60) | round(0) | int if sa and ea else none,
+          r_sale=((f.time_real_departure - f.time_scheduled_departure) / 60) | round(0) | int if f.time_real_departure and f.time_scheduled_departure else none,
+          fase='aterrizado' if f.has_landed else 'rodando' if (f.on_ground or 0) | int(0) == 1 else 'vuelo',
+          ft=(f.altitude or 0) | int(0), kmh=((f.ground_speed or 0) | float(0) * 1.852) | round(0) | int,
+          fr24='https://www.flightradar24.com/' ~ (f.callsign or f.flight_number or e.n) ~ '/' ~ f.id)] -%}
+    {%- endfor -%}
+  {%- endfor -%}
+  {{- ns.l | to_json -}}
+{%- endmacro %}
+{#- Fase previa (12 h antes de salir), con datos de AeroDataBox: adb_tramo deja de un vuelo de su API lo justo, con horas en
+    timestamps UTC (sp/se salida programada/revisada, lp/le llegada). -#}
+{% macro adb_tramo(f) -%}
+  {%- set d, a, ac, al = f.departure or {}, f.arrival or {}, f.aircraft or {}, f.airline or {} -%}
+  {%- set ad, aa = d.airport or {}, a.airport or {} -%}
+  {{- dict(n=(f.number or '') | replace(' ', ''), estado=f.status or '', de=ad.iata or '', a=aa.iata or '',
+      origen=ad.municipalityName or ad.iata or '', destino=aa.municipalityName or aa.iata or '',
+      sp=as_timestamp((d.scheduledTime or {}).utc, 0) | int, se=as_timestamp((d.revisedTime or d.predictedTime or {}).utc, 0) | int,
+      lp=as_timestamp((a.scheduledTime or {}).utc, 0) | int, le=as_timestamp((a.revisedTime or a.predictedTime or {}).utc, 0) | int,
+      terminal=d.terminal or '', puerta=d.gate or '', reg=ac.reg or '', modelo=(ac.model or '') | regex_replace(' \\(.*\\)$', ''),
+      aerolinea=al.name or '', iata=al.iata or '', icao=al.icao or '') | to_json -}}
+{%- endmacro %}
+{#- Estado de un tramo para la línea «tu avión» -#}
+{% macro tramo_est(t) -%}
+  {{- 'cancel' if t.estado is search('Cancel') else 'fin' if t.estado == 'Arrived' else 'aire' if t.estado in ['Departed', 'EnRoute', 'Approaching'] else 'prog' -}}
+{%- endmacro %}
+{#- Salida prevista de mi vuelo encadenando los tramos anteriores del mismo avión ese día (lo que hace Flighty con «¿dónde está
+    mi avión?»): cada tramo sale cuando diga su hora revisada o, si no la hay, no antes de que llegue el anterior más la rotación
+    mínima; llega a su hora estimada o tras la duración programada. Mi vuelo: lo más tarde entre programada, revisada (AeroDataBox),
+    estimada de FR24 (se24, la que sale en su web) y avión listo. fuente = 'fr24' si manda la de FR24.
+    ponytail: rotación fija 35 min (estrecho) / 60 (ancho), sin mirar aeropuerto ni aerolínea. -#}
+{% macro prevision(cadena, mio, anchos='(A33|A34|A35|A38|330|340|350|380|B7[4-8]|7[4-8]7|Dreamliner)') -%}
+  {%- set rot = 3600 if (mio.modelo or '') is search(anchos) else 2100 -%}
+  {%- set ns = namespace(llega=0, prev=none) -%}
+  {%- for t in cadena | sort(attribute='sp') if t.sp and t.sp < mio.sp and t.sp > mio.sp - 86400 and t.n != mio.n and tramo_est(t) != 'cancel' -%}
+    {%- set sale = t.se or ([t.sp, ns.llega + rot] | max) -%}
+    {%- set ns.llega = t.le if t.le else sale + ((t.lp - t.sp) if t.lp else 0) -%}
+    {%- set ns.prev = t -%}
+  {%- endfor -%}
+  {%- set listo = ns.llega + rot if ns.llega else 0 -%}
+  {%- set se = [mio.se or 0, mio.get('se24') or 0] | max -%}
+  {%- set previsto = [mio.sp, se, listo] | max -%}
+  {{- dict(previsto=previsto, r=((previsto - mio.sp) / 60) | round(0) | int, llega=ns.llega,
+      motivo='avion' if listo > mio.sp and listo >= se else 'aerolinea' if se > mio.sp else '', prev=ns.prev, listo=listo,
+      fuente='fr24' if (mio.get('se24') or 0) > (mio.se or 0) and mio.se24 >= listo and mio.se24 > mio.sp else '') | to_json -}}
+{%- endmacro %}
+{#- El tiempo que retrasa vuelos en un METAR crudo: tormenta, nieve, hielo, niebla, poca visibilidad (< 1500 m) o viento
+    (≥ 30 kt o rachas ≥ 40). Solo el parte actual: corta en TEMPO/BECMG/NOSIG/RMK. '' si nada. -#}
+{% macro tiempo_metar(raw) -%}
+  {%- set ns = namespace(l=[], fin=false) -%}
+  {%- for w in (raw or '').split(' ')[2:] -%}
+    {%- if w in ['TEMPO', 'BECMG', 'NOSIG', 'RMK'] -%}{%- set ns.fin = true -%}{%- endif -%}
+    {%- if not ns.fin -%}
+      {%- set k = 'Tormenta' if w is match('^[-+]?(VC)?TS') else 'Nieve' if w is match('^[-+]?(SH|BL|DR)?SN') else 'Hielo' if w is match('^[-+]?FZ')
+          else 'Niebla' if w is match('^(MI|BC|PR)?FG$') else 'Poca visibilidad' if w is match('^\\d{4}$') and w | int < 1500
+          else 'Viento fuerte' if w is match('^(\\d{3}|VRB)\\d{2,3}(G\\d{2,3})?KT$') and (w[3:5] | int >= 30 or ('G' in w and w.split('G')[1][:2] | int >= 40)) else '' -%}
+      {%- if k and k not in ns.l -%}{%- set ns.l = ns.l + [k] -%}{%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{- (['Tormenta', 'Nieve', 'Hielo', 'Niebla', 'Viento fuerte', 'Poca visibilidad'] | select('in', ns.l) | first) or '' -}}
+{%- endmacro %}
+{#- Causa probable de un retraso (no hay fuente pública de los motivos de las aerolíneas; Eurocontrol solo con acuerdo B2B):
+    1 cambio de avión (posible avería), 2 el avión llega tarde, 3 tiempo en origen o destino (METAR de FR24), 4 retrasos generales
+    (media ≥ 20 min en salidas del origen o llegadas al destino: probable regulación de tráfico), 5 si no, la aerolínea. -#}
+{% macro causa(f, p, ctx, reg_antes) -%}
+  {%- set o, d = (ctx or {}).get('origen') or {}, (ctx or {}).get('destino') or {} -%}
+  {%- set to, td = tiempo_metar(o.get('metar')), tiempo_metar(d.get('metar')) -%}
+  {%- set mo, md = o.get('media') or 0, d.get('media') or 0 -%}
+  {{- ('Cambio de avión (' ~ reg_antes ~ ' → ' ~ f.reg ~ ')') if reg_antes and f.get('reg') and reg_antes != f.reg
+    else ('Tu avión llega tarde de ' ~ (p.prev.origen or p.prev.de)) if p.motivo == 'avion' and p.prev
+    else (td ~ ' en ' ~ (f.destino or f.a)) if td else (to ~ ' en ' ~ (f.origen or f.de)) if to
+    else ('Probable regulación: llegadas a ' ~ f.a ~ ' +' ~ md ~ ' min') if md >= 20 and md >= mo
+    else ('Probable regulación: salidas de ' ~ f.de ~ ' +' ~ mo ~ ' min') if mo >= 20
+    else 'Sin causa visible (aerolínea)' -}}
+{%- endmacro %}
+{#- La tarjeta previa: los de la lista con datos (datos[«N fecha»] lo guarda sensor.vuelo_previo) que salen en menos de 12 h,
+    aún no despegados y que FR24 no ve en directo (vivos). Cancelados, hasta 1 h después de su hora. -#}
+{% macro vuelo_previo(datos, s, vivos, ahora) -%}
+  {%- set ns = namespace(l=[]) -%}
+  {%- for e in lista_vuelos(s) | from_json -%}
+    {%- set x = (datos or {}).get(e.n ~ ' ' ~ e.d) or {} -%}
+    {%- set f = x.get('fl') or {} -%}
+    {%- if f.get('sp') and e.n not in vivos and e.n not in ns.l | map(attribute='vuelo') | list and f.sp - ahora < 43200
+        and tramo_est(f) in ['prog', 'cancel'] -%}
+      {%- set cad = (x.get('cadena') or []) | sort(attribute='sp') | list -%}
+      {%- set p = prevision(cad, f) | from_json -%}
+      {#- el tramo anterior del avión no acaba donde sale el mío: a AeroDataBox le falta la vuelta (pasó con EC-NUZ: MAD-VGO sin
+          VGO-MAD). Se pinta un tramo sin horas hasta mi origen y la previsión no cuenta con el avión (no se sabe cuándo vuelve) -#}
+      {%- set falta = p.prev and p.prev.a != f.de -%}
+      {%- set aviso = ('Tu avión va a ' ~ (p.prev.destino or p.prev.a) ~ ' y vuelve a ' ~ (f.origen or f.de)) if falta else '' -%}
+      {%- if falta -%}{%- set p = dict(prevision([], f) | from_json, prev=p.prev) -%}{%- endif -%}
+      {%- if ahora < p.previsto + 3600 -%}
+        {%- set cancel = tramo_est(f) == 'cancel' -%}
+        {%- set tramos = cad | selectattr('sp', 'lt', f.sp) | selectattr('sp', 'gt', f.sp - 86400) | list -%}
+        {#- solo los que enlazan, de atrás adelante (AeroDataBox se salta tramos: EC-NUZ sin SVQ-MAD pintaba «MAD ── MAD») -#}
+        {%- set ce = namespace(l=[]) -%}
+        {%- for t in tramos | reverse -%}{%- if not ce.l or t.a == ce.l[0].de -%}{%- set ce.l = [t] + ce.l -%}{%- endif -%}{%- endfor -%}
+        {%- set tramos = ce.l -%}
+        {%- set prev = p.prev -%}
+        {#- al tocar: el vuelo que hace ahora su avión, si vuela; si no, el avión (con matrícula) o el vuelo. Nunca /data/...:
+            la app de pago de FR24 no los acepta (apple-app-site-association) y se abrirían en Safari -#}
+        {#- FR24 solo abre un vuelo concreto con /indicativo/id (fr24_matricula.py); con el número a secas, el mapa sin él -#}
+        {%- set vivo = namespace(n='') -%}
+        {%- for t in cad if not vivo.n and t.n and tramo_est(t) == 'aire' -%}
+          {%- set vivo.n = ((t.get('cs') or t.n) ~ '/' ~ t.id) if t.get('id') else t.n -%}
+        {%- endfor -%}
+        {%- set ns.l = ns.l + [dict(vuelo=e.n, quien=e.q, previo=true, modelo=f.modelo, reg=f.reg, anos=x.get('anos'), aerolinea=f.aerolinea, iata=f.iata, icao=f.icao,
+            de=f.de, a=f.a, origen=f.origen, destino=f.destino, sale=f.sp, llega=f.lp, previsto=p.previsto, avion_llega=p.llega, r=p.r, motivo=p.motivo,
+            aviso=aviso, causa=causa(f, p, f.get('ctx'), x.get('reg_antes')) if cancel or p.r >= 15 else '', fuente_prev=p.get('fuente') or '',
+            terminal=f.terminal, puerta=f.puerta, puerta_antes=x.get('puerta_antes') or '',
+            estado='cancelado' if cancel else 'embarque' if f.estado in ['Boarding', 'GateClosed'] else 'retraso' if p.r >= 15 else 'hora' if f.estado not in ['', 'Unknown'] else 'prog',
+            cadena=tramo_lista(tramos[-(2 if falta else 3):] + ([dict(n='', estado='Expected', de=p.prev.a, a=f.de, sp=0, se=0, lp=0, le=0)] if falta else []) + [f], f.n) | from_json,
+            fr24='https://www.flightradar24.com/' ~ (vivo.n or f.reg or e.n))] -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{- ns.l | to_json -}}
+{%- endmacro %}
+{% macro tramo_lista(l, mio) -%}
+  {%- set ns = namespace(l=[]) -%}
+  {%- for t in l -%}
+    {%- set ns.l = ns.l + [dict(de=t.de, a=t.a, sale=t.se or t.sp, llega=t.le or t.lp, est=tramo_est(t), mio=t.n == mio,
+        r=((t.le - t.lp) / 60) | round(0) | int if t.le and t.lp else none)] -%}
+  {%- endfor -%}
+  {{- ns.l | to_json -}}
+{%- endmacro %}

@@ -1,0 +1,26 @@
+{# Posición de una persiana Tuya que no informa de ella: se reconstruye con la última orden (también la del
+   botón de la pared) y el tiempo de recorrido. El interruptor manda «parar» solo al acabar, así que
+   un movimiento de casi todo el recorrido = arriba o abajo del todo. Devuelve JSON {pos, mov, t0}. #}
+{# cae=true: broken motor (dormitorio); stopping it halfway makes it fall by gravity to an unknown point. #}
+{% macro persiana(pos, mov, t0, orden, travel, ahora, cae=false) -%}
+{%- set pos = pos | float(none) -%}
+{%- set mov = mov | int(0) -%}
+{%- set t0 = t0 | float(0) -%}
+{%- set travel = travel | float(30) -%}
+{%- if mov != 0 -%}
+  {%- set dt = ahora - t0 -%}
+  {%- if dt >= travel - 2 -%}
+    {%- set pos = 100 if mov > 0 else 0 -%}
+  {%- elif cae -%}
+    {%- set pos = none -%}
+  {%- elif pos is not none -%}
+    {%- set pos = [0, [100, pos + mov * dt / travel * 100] | min] | max -%}
+  {%- endif -%}
+  {%- set mov = 0 -%}
+{%- endif -%}
+{%- if orden in ['subir', 'bajar'] -%}
+  {%- set mov = 1 if orden == 'subir' else -1 -%}
+  {%- set t0 = ahora -%}
+{%- endif -%}
+{{- {'pos': (pos | round(0) | int) if pos is not none else none, 'mov': mov, 't0': t0} | to_json -}}
+{%- endmacro %}

@@ -1,0 +1,16 @@
+# Tarjeta y página «Oración» del Marco (CONFIG.oracion = true): liturgia.py deja www/marco/liturgia.json cada hora.
+# Copia liturgia.py a /config/marco/. Los mensajes con IA usan OpenAI: la clave en /config/.openai-key (sin ella, MARCO_SIN_IA=1).
+shell_command:
+  marco_liturgia: "python3 /config/marco/liturgia.py"
+
+automation:
+  - id: marco_liturgia
+    alias: Marco · liturgia del día
+    mode: single
+    triggers:
+      - trigger: time_pattern
+        minutes: "5"
+      - trigger: homeassistant
+        event: start
+    actions:
+      - action: shell_command.marco_liturgia

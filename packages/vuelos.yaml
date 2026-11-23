@@ -1,0 +1,238 @@
+# Vuelos que sigue la familia: se dan de alta en Ajustes del Marco (número, fecha, quién) y se guardan aquí.
+# ponytail: 255 caracteres = unos 8 vuelos; si no llega, pasar a una lista de tareas (todo).
+input_text:
+  vuelos_seguidos:
+    name: Vuelos seguidos
+    max: 255
+
+# AeroDataBox (RapidAPI, plan Basic gratuito) para la fase previa. La clave está en secrets.yaml (aerodatabox_key).
+rest_command:
+  aerodatabox:
+    url: "https://aerodatabox.p.rapidapi.com/{{ path }}"
+    headers:
+      X-RapidAPI-Key: !secret aerodatabox_key
+      X-RapidAPI-Host: aerodatabox.p.rapidapi.com
+    timeout: 20
+
+# Matrícula de las salidas programadas de FR24 (marco/fr24_matricula.py, la librería de la integración) cuando AeroDataBox
+# no la sabe: FR24 la tiene horas antes (UX5053 15-11: EC-NUZ a T-4 h; AeroDataBox nunca la dio). Imprime JSON o {}.
+shell_command:
+  fr24_matricula: "python3 /config/marco/fr24_matricula.py {{ ap }} {{ n }} {{ sp }} {{ reg }}"
+
+automation:
+  # El día del vuelo lo pide a FR24 (lo sigue ya programado y pasa a «live» al salir de la puerta). Cada minuto por si FR24
+  # aún no lo encontraba o HA se reinició: un vuelo YA en el aire solo entra si get_flight_details contesta, y ese endpoint
+  # está en pausa por 429 buena parte del tiempo (la integración da entonces «No flight found», EY223 14-11). 30 min después de aterrizar lo suelta y lo quita de la lista; las fechas
+  # pasadas (antes de ayer: los nocturnos siguen) se borran solas. Quitarlo en Ajustes también lo suelta.
+  # Los go-arounds los sigue y suelta avion_ga_seguir.
+  - id: vuelos_seguidos
+    alias: Vuelos seguidos en FR24
+    mode: queued
+    triggers:
+      - trigger: time_pattern
+        minutes: /1
+      - trigger: state
+        entity_id: input_text.vuelos_seguidos
+    actions:
+      - variables:
+          lista: "{% from 'aviones.jinja' import lista_vuelos %}{{ lista_vuelos(states('input_text.vuelos_seguidos')) | from_json }}"
+          antes: >-
+            {% from 'aviones.jinja' import lista_vuelos %}{{ (lista_vuelos(trigger.from_state.state) | from_json | map(attribute='n') | list)
+            if trigger.platform == 'state' and trigger.from_state else [] }}
+          fr24: "{{ state_attr('sensor.flightradar24_rastreados_adicionales', 'flights') or [] }}"
+          hoy: "{{ now().date() | string }}"
+          ayer: "{{ (now() - timedelta(days=1)).date() | string }}"
+          # seguidos aterrizados (has_landed: FR24 arrastra time_real_arrival del tramo anterior) hace más de 30 min, de la lista o no
+          # (un go-around que se quedó colgado también se suelta). El primero de cada uno es por el que se suelta.
+          aterrizados: >-
+            {% set ns = namespace(l=[]) %}{% for f in fr24 if f.has_landed and now().timestamp() - (f.time_real_arrival or 0) > 1800 %}
+            {% set ns.l = ns.l + [[f.callsign or f.flight_number, f.flight_number]] %}{% endfor %}{{ ns.l }}
+          hechos: "{{ aterrizados | map('first') | list + aterrizados | map('last') | list }}"
+          quedan: "{{ lista | rejectattr('n', 'in', hechos) | selectattr('d', 'ge', ayer) | list }}"
+          seguidos: "{{ fr24 | map(attribute='flight_number') | list + fr24 | map(attribute='callsign') | list }}"
+      # soltar: los que ya aterrizaron y los que se quitaron de la lista
+      - repeat:
+          for_each: "{{ aterrizados | map('first') | reject('none') | list + (antes | reject('in', lista | map(attribute='n') | list) | list) }}"
+          sequence:
+            - if: "{{ repeat.item in seguidos }}"
+              then:
+                - action: text.set_value
+                  target:
+                    entity_id: text.flightradar24_remove_from_track
+                  data:
+                    value: "{{ repeat.item }}"
+      - if: "{{ quedan | count != lista | count }}"
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.vuelos_seguidos
+            data:
+              value: "{% for e in quedan %}{{ e.n }}{{ '/' ~ e.m if e.m }} {{ e.d }}{{ ' ' ~ e.q if e.q }}{{ '; ' if not loop.last }}{% endfor %}"
+      # pedir los de hoy que FR24 aún no sigue
+      - repeat:
+          for_each: "{{ quedan | selectattr('d', 'eq', hoy) | map(attribute='n') | reject('in', seguidos) | list }}"
+          sequence:
+            - action: text.set_value
+              target:
+                entity_id: text.flightradar24_add_to_track
+              data:
+                value: "{{ repeat.item }}"
+
+  # Fase previa: desde 12 h antes, FR24 (fr24_matricula.py, salidas y llegadas del aeropuerto de origen): estado, hora estimada,
+  # terminal, puerta, matrícula, el vuelo que trae el avión y retrasos/METAR para la causa. Cada hora, y cada 15 min en las 3
+  # últimas; antes de las 12 h, cada 3 h. AeroDataBox solo da la ruta y la hora la primera vez (FR24 no la sabe solo con el número:
+  # su lista de vuelos da 403), la antigüedad de cada matrícula nueva y hace de respaldo si FR24 no contesta. Lo guarda
+  # sensor.vuelo_previo (evento vuelo_previo). Para en cuanto despega, se cancela o FR24 lo ve en directo.
+  # ponytail: ~3 unidades de AeroDataBox por vuelo (400 al mes gratis); si FR24 bloquea mucho rato, el respaldo gasta 2 cada vez.
+  - id: vuelos_previo
+    alias: Vuelos seguidos, fase previa (FR24 y AeroDataBox)
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: time_pattern
+        minutes: /15
+      - trigger: state
+        entity_id: input_text.vuelos_seguidos
+    actions:
+      - variables:
+          ahora: "{{ now().timestamp() | int }}"
+          datos: "{{ state_attr('sensor.vuelo_previo', 'datos') or {} }}"
+          toca: >-
+            {% from 'aviones.jinja' import lista_vuelos %}
+            {% set vivos = (state_attr('sensor.vuelo_seguido', 'vuelos') or []) | map(attribute='vuelo') | list %}
+            {% set hoy, manana = now().date() | string, (now() + timedelta(days=1)).date() | string %}
+            {% set ns = namespace(l=[]) %}
+            {% for e in lista_vuelos(states('input_text.vuelos_seguidos')) | from_json if e.n not in vivos and (e.d == hoy or e.d == manana and now().hour >= 12) %}
+              {% set x = datos.get(e.n ~ ' ' ~ e.d) or {} %}{% set f = x.get('fl') or {} %}
+              {% set falta = f.sp - ahora if f.get('sp') else none %}
+              {% set cada = 180 if falta is none or falta > 43200 else 60 if falta > 10800 else 15 %}
+              {% if f.get('estado') not in ['Departed', 'EnRoute', 'Approaching', 'Arrived', 'Diverted', 'Canceled', 'CanceledUncertain']
+                  and (falta is none or falta > -3600) and (trigger.platform == 'state' or ahora - (x.get('t') or 0) >= cada * 60 - 90) %}
+                {% set ns.l = ns.l + [dict(n=e.n, d=e.d, k=e.n ~ ' ' ~ e.d, m=e.m, fl=f, r24=f.get('reg') if f.get('reg_fr24') else '', reg_anos=x.get('reg_anos') or '')] %}
+              {% endif %}
+            {% endfor %}{{ ns.l }}
+      - repeat:
+          for_each: "{{ toca }}"
+          sequence:
+            - variables:
+                cadena: []
+                anos: null
+                fl: "{{ repeat.item.fl }}"
+                adb: false
+            # la ruta y la hora (aeropuerto de salida para FR24): de AeroDataBox, solo la primera vez
+            - if: "{{ not fl.get('de') }}"
+              then:
+                - action: rest_command.aerodatabox
+                  data:
+                    path: "flights/number/{{ repeat.item.n }}/{{ repeat.item.d }}?withAircraftImage=false&withLocation=false&dateLocalRole=Departure"
+                  response_variable: r
+                  continue_on_error: true
+                - variables:
+                    adb: true
+                    fl: >-
+                      {% from 'aviones.jinja' import adb_tramo %}
+                      {% set c = r.content if r is defined and r.status == 200 and r.content is list else [] %}{{ adb_tramo(c[0]) | from_json if c else {} }}
+            - if: "{{ (fl.get('sp') or 0) > 0 }}"
+              then:
+                - action: shell_command.fr24_matricula
+                  data:
+                    ap: "{{ fl.de }}"
+                    n: "{{ repeat.item.n }}"
+                    sp: "{{ fl.sp | int }}"
+                    reg: "{{ fl.get('reg') or repeat.item.m or '-' }}"
+                  response_variable: r24
+                  continue_on_error: true
+                - variables:
+                    x: "{{ r24.stdout | from_json if r24 is defined and r24.get('stdout', '') is match('\\{') else {} }}"
+            # FR24 manda sobre lo guardado (salvo modelo y ciudades de AeroDataBox, más completos); sin respuesta, AeroDataBox
+            - if: "{{ x is defined and x.get('fl') is mapping }}"
+              then:
+                - variables:
+                    cadena: "{{ x.cadena }}"
+                    fl: >-
+                      {% set ns = namespace(f=dict(fl, se24=x.fl.se, ctx=x.ctx, reg_fr24=false)) %}
+                      {% for k, v in x.fl.items() if v and not (k in ['modelo', 'origen', 'destino'] and fl.get(k)) %}{% set ns.f = dict(ns.f, **{k: v}) %}{% endfor %}
+                      {{ dict(ns.f, reg_fr24=true) if x.fl.reg else ns.f }}
+              else:
+                - if: "{{ not adb }}"
+                  then:
+                    - action: rest_command.aerodatabox
+                      data:
+                        path: "flights/number/{{ repeat.item.n }}/{{ repeat.item.d }}?withAircraftImage=false&withLocation=false&dateLocalRole=Departure"
+                      response_variable: r
+                      continue_on_error: true
+                    - variables:
+                        fl: >-
+                          {% from 'aviones.jinja' import adb_tramo %}
+                          {% set c = r.content if r is defined and r.status == 200 and r.content is list else [] %}{{ adb_tramo(c[0]) | from_json if c else fl }}
+            # matrícula: la de FR24 o AeroDataBox; si no, la última que dio FR24, y si no, la puesta a mano en Ajustes
+            - variables:
+                fl: >-
+                  {{ fl if not fl or fl.get('reg') else dict(fl, reg=repeat.item.r24, reg_fr24=true) if repeat.item.r24
+                     else dict(fl, reg=repeat.item.m, reg_mano=true) if repeat.item.m else fl }}
+            - if: "{{ fl.get('reg') and fl.reg != repeat.item.reg_anos }}"
+              then:
+                - action: rest_command.aerodatabox
+                  data:
+                    path: "aircrafts/reg/{{ fl.reg }}?withImage=false&withRegistrations=false"
+                  response_variable: r3
+                  continue_on_error: true
+                - variables:
+                    anos: "{{ (r3.content.ageYears | round(1)) if r3 is defined and r3.status == 200 and r3.content.ageYears is defined else none }}"
+            - event: vuelo_previo
+              event_data:
+                k: "{{ repeat.item.k }}"
+                t: "{{ ahora }}"
+                fl: "{{ fl if fl else none }}"
+                cadena: "{{ cadena }}"
+                anos: "{{ anos }}"
+                reg_anos: "{{ fl.reg if anos is not none and fl.get('reg') else '' }}"
+
+  # Avisos al móvil de la fase previa (de todos los vuelos, o solo de los «quien» de la lista quienes): cancelado, retraso previsto ≥ 15 min (y luego
+  # cada vez que cambie 15 min más), cambio de puerta o terminal, y el embarque 40 min antes de la salida prevista.
+  # Mismo tag por vuelo: cada aviso sustituye al anterior. Al tocarlo abre lo mismo que la tarjeta.
+  # ponytail: el retraso se compara con el estado anterior, no con el último aviso (un retraso que crece de 5 en 5 no avisa).
+  - id: vuelos_previo_avisos
+    alias: Avisos de vuelos seguidos
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: sensor.vuelo_previo
+        attribute: vuelos
+        id: cambio
+      - trigger: time_pattern
+        minutes: /1
+        id: minuto
+    actions:
+      - variables:
+          quienes: []   # p. ej. ['papá', 'mamá'] (en minúsculas); vacía = todos
+          avisos: >-
+            {% set nuevos = (trigger.to_state.attributes.vuelos if trigger.id == 'cambio' else state_attr('sensor.vuelo_previo', 'vuelos')) or [] %}
+            {% set viejos = (trigger.from_state.attributes.vuelos or []) if trigger.id == 'cambio' and trigger.from_state else [] %}
+            {% set ns = namespace(l=[]) %}
+            {% for c in nuevos if not quienes or (c.quien or '') | lower in quienes %}
+              {% set o = viejos | selectattr('vuelo', 'eq', c.vuelo) | first %}
+              {% set hora = c.previsto | timestamp_custom('%H:%M') %}
+              {% if trigger.id == 'cambio' and o %}
+                {% if c.estado == 'cancelado' and o.estado != 'cancelado' %}
+                  {% set ns.l = ns.l + [dict(c=c, m='Cancelado. Iba a ' ~ c.destino ~ ' a las ' ~ c.sale | timestamp_custom('%H:%M') ~ '.' ~ (' ' ~ c.causa ~ '.' if c.get('causa') else ''))] %}
+                {% elif c.r >= 15 and (o.r < 15 or (c.r - o.r) | abs >= 15) %}
+                  {% set ns.l = ns.l + [dict(c=c, m='Sale hacia las ' ~ hora ~ ' (+' ~ c.r ~ ' min)' ~ ('. ' ~ c.causa if c.get('causa') else '') ~ '.')] %}
+                {% endif %}
+                {% if c.puerta and (c.puerta != o.puerta or c.terminal != o.terminal) %}
+                  {% set ns.l = ns.l + [dict(c=c, m='Puerta ' ~ c.puerta ~ (' · T' ~ c.terminal if c.terminal) ~ (' (antes ' ~ o.puerta ~ ')' if o.puerta and o.puerta != c.puerta) ~ '. Sale a las ' ~ hora ~ '.')] %}
+                {% endif %}
+              {% elif trigger.id == 'minuto' and c.estado != 'cancelado' and 0 <= now().timestamp() - (c.previsto - 2400) < 60 %}
+                {% set ns.l = ns.l + [dict(c=c, m='Embarque' ~ (' por la puerta ' ~ c.puerta if c.puerta else '') ~ '. Sale a las ' ~ hora ~ '.')] %}
+              {% endif %}
+            {% endfor %}{{ ns.l }}
+      - repeat:
+          for_each: "{{ avisos }}"
+          sequence:
+            - action: notify.notify   # cámbialo por tu notify.mobile_app_<tu_móvil>
+              data:
+                title: "✈️ {{ repeat.item.c.vuelo }} · {{ repeat.item.c.quien }}"
+                message: "{{ repeat.item.m }}"
+                data:
+                  tag: "vuelo-{{ repeat.item.c.vuelo }}"
+                  url: "{{ repeat.item.c.fr24 }}"

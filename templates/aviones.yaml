@@ -1,0 +1,102 @@
+# "Alexa, ¿qué avión es ese?": el avión que más probablemente se oye desde casa.
+# Casa a ~5 km de Barajas: se descartan los que ruedan despacio por el aeropuerto y se ordena por
+# distancia real (horizontal + altura sobre casa, que está a 694 m). Más de 8 km = no se oye.
+# FR24 da altitude en pies sobre el mar, distance en km, vertical_speed en pies/min.
+# La macro se calcula UNA vez por lectura (actions → variables: r) y estado y atributos salen de r. Antes cada
+# campo la recalculaba (7 veces cada 10 s). Disparadores: los que la plantilla leía (cambio de estado o de atributos).
+# En actions no hay `this` (es por entidad): el estado anterior se lee por su nombre, que aún no se ha actualizado.
+- triggers:
+    - trigger: state
+      entity_id: [sensor.flightradar24_current_in_area, sensor.flightradar24_rastreados_adicionales, sensor.metar_lemd]
+    - trigger: homeassistant
+      event: start
+    - trigger: event
+      event_type: event_template_reloaded
+    # para que el aviso de desvío caduque a los 5 min aunque FR24 no cambie nada
+    - trigger: time_pattern
+      minutes: /1
+  actions:
+    - variables:
+        r: >-
+          {% from 'aviones.jinja' import avion_cercano %}{{ avion_cercano(state_attr('sensor.flightradar24_current_in_area', 'flights'), ga_prev=state_attr('sensor.avion_cercano', 'ga') or [], seguidos=state_attr('sensor.flightradar24_rastreados_adicionales', 'flights'), motivo_prev=state_attr('sensor.avion_cercano', 'motivo'), metar=states.sensor.metar_lemd.attributes if states.sensor.metar_lemd else none, desvio_prev=state_attr('sensor.avion_cercano', 'desvio')) | from_json }}
+  sensor:
+    - name: Avión cercano
+      unique_id: avion_cercano
+      default_entity_id: sensor.avion_cercano
+      icon: mdi:airplane
+      state: "{{ r.modelo }}"
+      attributes:
+        frase: "{{ r.frase }}"
+        candidatos: "{{ r.candidatos }}"
+        # lo que pinta la tarjeta «Avión» del Marco (null si no se oye ninguno)
+        info: "{{ r.get('info') }}"
+        # go-arounds marcados (ids de FR24): siguen siéndolo hasta tomar tierra y frenar, o hasta desviarse; fuera del área los sigue FR24 (automatización avion_ga_seguir)
+        ga: "{{ r.ga }}"
+        # motivo probable del go-around ({id, texto}), calculado al detectarlo y fijo hasta que deja de estar marcado
+        motivo: "{{ r.motivo }}"
+        # go-around que se ha desviado a otro aeropuerto: foto fija del vuelo durante 5 min ({id, t, vuelo, destino, a, ...}); null si no hay
+        desvio: "{{ r.desvio }}"
+        # para ajustar el go-around: llegadas a Barajas que suben, con sus datos (se quedan en el historial de HA)
+        subiendo: "{{ r.subiendo }}"
+# Vuelos que sigue la familia (lista en input_text.vuelos_seguidos, se da de alta en Ajustes del Marco) que FR24 ya ve en directo.
+# Lo pintan la tarjeta «Vuelo seguido» del Marco y custom:vuelo-seguido-card. Estado = cuántos.
+- triggers:
+    - trigger: state
+      entity_id: [sensor.flightradar24_rastreados_adicionales, input_text.vuelos_seguidos, sensor.avion_cercano]
+    - trigger: homeassistant
+      event: start
+    - trigger: event
+      event_type: event_template_reloaded
+  actions:
+    - variables:
+        v: >-
+          {% from 'aviones.jinja' import vuelo_seguido %}{{ vuelo_seguido(state_attr('sensor.flightradar24_rastreados_adicionales', 'flights'), states('input_text.vuelos_seguidos'), state_attr('sensor.avion_cercano', 'ga') or []) | from_json }}
+  sensor:
+    - name: Vuelo seguido
+      unique_id: vuelo_seguido
+      default_entity_id: sensor.vuelo_seguido
+      icon: mdi:airplane-marker
+      state: "{{ v | count }}"
+      attributes:
+        vuelos: "{{ v }}"
+# Fase previa de esos vuelos (12 h antes de salir): la automatización vuelos_previo pide a AeroDataBox y manda el evento
+# vuelo_previo {k: «N fecha», fl, cadena?, anos?}. datos guarda lo último de cada uno (y la puerta anterior si cambia);
+# vuelos es lo que pintan las tarjetas «Siguiendo» antes de despegar. Estado = cuántos.
+- triggers:
+    - trigger: event
+      event_type: vuelo_previo
+    - trigger: state
+      entity_id: [input_text.vuelos_seguidos, sensor.vuelo_seguido]
+    - trigger: time_pattern
+      minutes: /5
+    - trigger: event
+      event_type: event_template_reloaded
+  actions:
+    - variables:
+        datos: >-
+          {% from 'aviones.jinja' import lista_vuelos %}
+          {% set claves = lista_vuelos(states('input_text.vuelos_seguidos')) | from_json | map(attribute='n') | list %}
+          {% set ns = namespace(d={}) %}
+          {% for k, x in (state_attr('sensor.vuelo_previo', 'datos') or {}).items() if k.split(' ')[0] in claves %}{% set ns.d = dict(ns.d, **{k: x}) %}{% endfor %}
+          {% if trigger.platform == 'event' and trigger.event.event_type == 'vuelo_previo' %}
+            {% set e, o = trigger.event.data, ns.d.get(trigger.event.data.k) or {} %}
+            {% set fl, ofl = e.get('fl') or o.get('fl') or {}, o.get('fl') or {} %}
+            {% set antes = ofl.puerta if ofl.get('puerta') and fl.get('puerta') and ofl.puerta != fl.puerta else o.get('puerta_antes') or '' %}
+            {#- matrícula anterior, si cambia: cambio de avión (causa probable de retraso) -#}
+            {% set reg_antes = ofl.reg if ofl.get('reg') and fl.get('reg') and ofl.reg != fl.reg else o.get('reg_antes') or '' %}
+            {% set ns.d = dict(ns.d, **{e.k: dict(fl=fl, cadena=e.get('cadena') or o.get('cadena') or [], anos=e.get('anos') or o.get('anos'),
+                reg_anos=e.get('reg_anos') or o.get('reg_anos') or '', puerta_antes=antes, reg_antes=reg_antes, t=e.t)}) %}
+          {% endif %}
+          {{ ns.d }}
+        v: >-
+          {% from 'aviones.jinja' import vuelo_previo %}{{ vuelo_previo(datos, states('input_text.vuelos_seguidos'),
+          (state_attr('sensor.vuelo_seguido', 'vuelos') or []) | map(attribute='vuelo') | list, now().timestamp()) | from_json }}
+  sensor:
+    - name: Vuelo previo
+      unique_id: vuelo_previo
+      default_entity_id: sensor.vuelo_previo
+      icon: mdi:airplane-clock
+      state: "{{ v | count }}"
+      attributes:
+        datos: "{{ datos }}"
+        vuelos: "{{ v }}"

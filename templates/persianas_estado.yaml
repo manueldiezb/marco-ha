@@ -1,0 +1,471 @@
+# Estado de las persianas Tuya (no informan de su posición). Lógica en custom_templates/persianas.jinja.
+# cover.estado_persiana_* manda las órdenes a la persiana real y muestra abierta/cerrada/% en los paneles.
+
+# Alexa en español manda "sube/baja la(s) persiana(s)" como AdjustRangeValue (+-25 %), no como abrir/cerrar.
+# Se apunta aquí a qué persiana (o al grupo cover.persianas) y desde qué posición, para que cada
+# set_cover_position lo convierta en subir/bajar del todo en esa dirección.
+- triggers:
+    - trigger: event
+      event_type: alexa_smart_home
+      event_data:
+        request:
+          name: AdjustRangeValue
+  sensor:
+    - name: Alexa ajuste persiana
+      unique_id: alexa_ajuste_persiana
+      default_entity_id: sensor.alexa_ajuste_persiana
+      state: "{{ trigger.event.data.request.entity_id }}"
+      attributes:
+        t: "{{ now().timestamp() }}"
+        antes: "{{ state_attr(trigger.event.data.request.entity_id, 'current_position') }}"
+
+- triggers:
+    - trigger: state
+      entity_id: sensor.persiana_salon_ultima_orden
+      to: [subir, bajar, parar]
+      id: orden
+    - trigger: state
+      entity_id: sensor.persiana_salon_ultima_orden
+      to: [subir, bajar]
+      for:
+        seconds: "{{ state_attr('cover.persiana_salon','tr_timecontrol') | float(27) }}"
+      id: fin
+  actions:   # la macro una vez; en actions no hay `this`: el estado anterior se lee por su nombre
+    - variables:
+        r: "{% from 'persianas.jinja' import persiana %}{{ persiana(states('sensor.persiana_salon_posicion'), state_attr('sensor.persiana_salon_posicion', 'mov'), state_attr('sensor.persiana_salon_posicion', 't0'), trigger.to_state.state if trigger.id == 'orden' else '', state_attr('cover.persiana_salon','tr_timecontrol') | float(27), now().timestamp()) | from_json }}"
+  sensor:
+    - name: Persiana Salón posición
+      unique_id: persiana_salon_posicion
+      default_entity_id: sensor.persiana_salon_posicion
+      unit_of_measurement: "%"
+      icon: mdi:window-shutter
+      state: "{{ r.pos }}"
+      attributes:
+        mov: "{{ r.mov }}"
+        t0: "{{ r.t0 }}"
+- cover:
+    - name: Persiana Salón
+      unique_id: estado_persiana_salon
+      default_entity_id: cover.estado_persiana_salon
+      device_class: blind
+      state: >-
+        {% set m = state_attr('sensor.persiana_salon_posicion', 'mov') | int(0) %}{% set p = states('sensor.persiana_salon_posicion') | int(none) %}
+        {{ 'opening' if m > 0 else 'closing' if m < 0 else none if p is none else 'closed' if p <= 3 else 'open' }}
+      # Sin posición mientras se mueve: así siempre cambia al terminar y pisa el % que HA guarda solo al pedir un %.
+      position: "{{ none if state_attr('sensor.persiana_salon_posicion', 'mov') | int(0) != 0 else states('sensor.persiana_salon_posicion') | int(none) }}"
+      open_cover:
+        - action: cover.open_cover
+          target:
+            entity_id: cover.persiana_salon
+      close_cover:
+        - action: cover.close_cover
+          target:
+            entity_id: cover.persiana_salon
+      stop_cover:
+        - action: cover.stop_cover
+          target:
+            entity_id: cover.persiana_salon
+      # Ir a un % (Alexa, panel): se manda subir/bajar y se para al cabo de |destino − actual| × recorrido.
+      # Si no se sabe dónde está, primero baja del todo para tener referencia.
+      set_cover_position:
+        - variables:
+            travel: "{{ state_attr('cover.persiana_salon','tr_timecontrol') | float(27) }}"
+            inicio: "{{ now().timestamp() }}"
+        # Si es un "sube/baja" de Alexa sin % (a esta persiana o al grupo), va del todo en esa dirección.
+        - delay: 1
+        - variables:
+            alexa: "{{ states('sensor.alexa_ajuste_persiana') in ['cover.estado_persiana_salon', 'cover.persianas'] and (state_attr('sensor.alexa_ajuste_persiana', 't') | float(0) - inicio | float(0)) | abs < 5 }}"
+            position: "{{ (100 if position > state_attr('sensor.alexa_ajuste_persiana', 'antes') | float(50) else 0) if alexa else position }}"
+        - if: "{{ state_attr('sensor.persiana_salon_posicion', 'mov') | int(0) != 0 }}"
+          then:
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_salon
+            - delay: 1
+        - choose:
+            - conditions: "{{ position >= 97 }}"
+              sequence:
+                - action: cover.open_cover
+                  target:
+                    entity_id: cover.persiana_salon
+            - conditions: "{{ position <= 3 }}"
+              sequence:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_salon
+          default:
+            - if: "{{ states('sensor.persiana_salon_posicion') | int(none) is none }}"
+              then:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_salon
+                - wait_template: "{{ states('sensor.persiana_salon_posicion') | int(-1) == 0 }}"
+                  timeout:
+                    seconds: "{{ travel + 10 }}"
+            - variables:
+                actual: "{{ states('sensor.persiana_salon_posicion') | float(0) }}"
+            - condition: template
+              value_template: "{{ (position - actual) | abs >= 3 }}"
+            - action: "{{ 'cover.open_cover' if position > actual else 'cover.close_cover' }}"
+              target:
+                entity_id: cover.persiana_salon
+            - delay:
+                seconds: "{{ ((position - actual) | abs / 100 * travel) | round(1) }}"
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_salon
+
+- triggers:
+    - trigger: state
+      entity_id: sensor.persiana_comedor_ultima_orden
+      to: [subir, bajar, parar]
+      id: orden
+    - trigger: state
+      entity_id: sensor.persiana_comedor_ultima_orden
+      to: [subir, bajar]
+      for:
+        seconds: "{{ state_attr('cover.persiana_comedor','tr_timecontrol') | float(60) }}"
+      id: fin
+  actions:   # la macro una vez; en actions no hay `this`: el estado anterior se lee por su nombre
+    - variables:
+        r: "{% from 'persianas.jinja' import persiana %}{{ persiana(states('sensor.persiana_comedor_posicion'), state_attr('sensor.persiana_comedor_posicion', 'mov'), state_attr('sensor.persiana_comedor_posicion', 't0'), trigger.to_state.state if trigger.id == 'orden' else '', state_attr('cover.persiana_comedor','tr_timecontrol') | float(60), now().timestamp()) | from_json }}"
+  sensor:
+    - name: Persiana Comedor posición
+      unique_id: persiana_comedor_posicion
+      default_entity_id: sensor.persiana_comedor_posicion
+      unit_of_measurement: "%"
+      icon: mdi:window-shutter
+      state: "{{ r.pos }}"
+      attributes:
+        mov: "{{ r.mov }}"
+        t0: "{{ r.t0 }}"
+- cover:
+    - name: Persiana Comedor
+      unique_id: estado_persiana_comedor
+      default_entity_id: cover.estado_persiana_comedor
+      device_class: blind
+      state: >-
+        {% set m = state_attr('sensor.persiana_comedor_posicion', 'mov') | int(0) %}{% set p = states('sensor.persiana_comedor_posicion') | int(none) %}
+        {{ 'opening' if m > 0 else 'closing' if m < 0 else none if p is none else 'closed' if p <= 3 else 'open' }}
+      # Sin posición mientras se mueve: así siempre cambia al terminar y pisa el % que HA guarda solo al pedir un %.
+      position: "{{ none if state_attr('sensor.persiana_comedor_posicion', 'mov') | int(0) != 0 else states('sensor.persiana_comedor_posicion') | int(none) }}"
+      open_cover:
+        - action: cover.open_cover
+          target:
+            entity_id: cover.persiana_comedor
+      close_cover:
+        - action: cover.close_cover
+          target:
+            entity_id: cover.persiana_comedor
+      stop_cover:
+        - action: cover.stop_cover
+          target:
+            entity_id: cover.persiana_comedor
+      # Ir a un % (Alexa, panel): se manda subir/bajar y se para al cabo de |destino − actual| × recorrido.
+      # Si no se sabe dónde está, primero baja del todo para tener referencia.
+      set_cover_position:
+        - variables:
+            travel: "{{ state_attr('cover.persiana_comedor','tr_timecontrol') | float(60) }}"
+            inicio: "{{ now().timestamp() }}"
+        # Si es un "sube/baja" de Alexa sin % (a esta persiana o al grupo), va del todo en esa dirección.
+        - delay: 1
+        - variables:
+            alexa: "{{ states('sensor.alexa_ajuste_persiana') in ['cover.estado_persiana_comedor', 'cover.persianas'] and (state_attr('sensor.alexa_ajuste_persiana', 't') | float(0) - inicio | float(0)) | abs < 5 }}"
+            position: "{{ (100 if position > state_attr('sensor.alexa_ajuste_persiana', 'antes') | float(50) else 0) if alexa else position }}"
+        - if: "{{ state_attr('sensor.persiana_comedor_posicion', 'mov') | int(0) != 0 }}"
+          then:
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_comedor
+            - delay: 1
+        - choose:
+            - conditions: "{{ position >= 97 }}"
+              sequence:
+                - action: cover.open_cover
+                  target:
+                    entity_id: cover.persiana_comedor
+            - conditions: "{{ position <= 3 }}"
+              sequence:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_comedor
+          default:
+            - if: "{{ states('sensor.persiana_comedor_posicion') | int(none) is none }}"
+              then:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_comedor
+                - wait_template: "{{ states('sensor.persiana_comedor_posicion') | int(-1) == 0 }}"
+                  timeout:
+                    seconds: "{{ travel + 10 }}"
+            - variables:
+                actual: "{{ states('sensor.persiana_comedor_posicion') | float(0) }}"
+            - condition: template
+              value_template: "{{ (position - actual) | abs >= 3 }}"
+            - action: "{{ 'cover.open_cover' if position > actual else 'cover.close_cover' }}"
+              target:
+                entity_id: cover.persiana_comedor
+            - delay:
+                seconds: "{{ ((position - actual) | abs / 100 * travel) | round(1) }}"
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_comedor
+
+- triggers:
+    - trigger: state
+      entity_id: sensor.persiana_cuarto_juegos_ultima_orden
+      to: [subir, bajar, parar]
+      id: orden
+    - trigger: state
+      entity_id: sensor.persiana_cuarto_juegos_ultima_orden
+      to: [subir, bajar]
+      for:
+        seconds: "{{ states('number.persiana_cuarto_juegos_travel_time') | float(27) }}"
+      id: fin
+  actions:   # la macro una vez; en actions no hay `this`: el estado anterior se lee por su nombre
+    - variables:
+        r: "{% from 'persianas.jinja' import persiana %}{{ persiana(states('sensor.persiana_cuarto_juegos_posicion'), state_attr('sensor.persiana_cuarto_juegos_posicion', 'mov'), state_attr('sensor.persiana_cuarto_juegos_posicion', 't0'), trigger.to_state.state if trigger.id == 'orden' else '', states('number.persiana_cuarto_juegos_travel_time') | float(27), now().timestamp()) | from_json }}"
+  sensor:
+    - name: Persiana Cuarto de Juegos posición
+      unique_id: persiana_cuarto_juegos_posicion
+      default_entity_id: sensor.persiana_cuarto_juegos_posicion
+      unit_of_measurement: "%"
+      icon: mdi:window-shutter
+      state: "{{ r.pos }}"
+      attributes:
+        mov: "{{ r.mov }}"
+        t0: "{{ r.t0 }}"
+- cover:
+    - name: Persiana Cuarto de Juegos
+      unique_id: estado_persiana_cuarto_juegos
+      default_entity_id: cover.estado_persiana_cuarto_juegos
+      device_class: blind
+      state: >-
+        {% set m = state_attr('sensor.persiana_cuarto_juegos_posicion', 'mov') | int(0) %}{% set p = states('sensor.persiana_cuarto_juegos_posicion') | int(none) %}
+        {{ 'opening' if m > 0 else 'closing' if m < 0 else none if p is none else 'closed' if p <= 3 else 'open' }}
+      # Sin posición mientras se mueve: así siempre cambia al terminar y pisa el % que HA guarda solo al pedir un %.
+      position: "{{ none if state_attr('sensor.persiana_cuarto_juegos_posicion', 'mov') | int(0) != 0 else states('sensor.persiana_cuarto_juegos_posicion') | int(none) }}"
+      open_cover:
+        - action: cover.open_cover
+          target:
+            entity_id: cover.persiana_cuarto_juegos
+      close_cover:
+        - action: cover.close_cover
+          target:
+            entity_id: cover.persiana_cuarto_juegos
+      stop_cover:
+        - action: cover.stop_cover
+          target:
+            entity_id: cover.persiana_cuarto_juegos
+      # Ir a un % (Alexa, panel): se manda subir/bajar y se para al cabo de |destino − actual| × recorrido.
+      # Si no se sabe dónde está, primero baja del todo para tener referencia.
+      set_cover_position:
+        - variables:
+            travel: "{{ states('number.persiana_cuarto_juegos_travel_time') | float(27) }}"
+            inicio: "{{ now().timestamp() }}"
+        # Si es un "sube/baja" de Alexa sin % (a esta persiana o al grupo), va del todo en esa dirección.
+        - delay: 1
+        - variables:
+            alexa: "{{ states('sensor.alexa_ajuste_persiana') in ['cover.estado_persiana_cuarto_juegos', 'cover.persianas'] and (state_attr('sensor.alexa_ajuste_persiana', 't') | float(0) - inicio | float(0)) | abs < 5 }}"
+            position: "{{ (100 if position > state_attr('sensor.alexa_ajuste_persiana', 'antes') | float(50) else 0) if alexa else position }}"
+        - if: "{{ state_attr('sensor.persiana_cuarto_juegos_posicion', 'mov') | int(0) != 0 }}"
+          then:
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_cuarto_juegos
+            - delay: 1
+        - choose:
+            - conditions: "{{ position >= 97 }}"
+              sequence:
+                - action: cover.open_cover
+                  target:
+                    entity_id: cover.persiana_cuarto_juegos
+            - conditions: "{{ position <= 3 }}"
+              sequence:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_cuarto_juegos
+          default:
+            - if: "{{ states('sensor.persiana_cuarto_juegos_posicion') | int(none) is none }}"
+              then:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_cuarto_juegos
+                - wait_template: "{{ states('sensor.persiana_cuarto_juegos_posicion') | int(-1) == 0 }}"
+                  timeout:
+                    seconds: "{{ travel + 10 }}"
+            - variables:
+                actual: "{{ states('sensor.persiana_cuarto_juegos_posicion') | float(0) }}"
+            - condition: template
+              value_template: "{{ (position - actual) | abs >= 3 }}"
+            - action: "{{ 'cover.open_cover' if position > actual else 'cover.close_cover' }}"
+              target:
+                entity_id: cover.persiana_cuarto_juegos
+            - delay:
+                seconds: "{{ ((position - actual) | abs / 100 * travel) | round(1) }}"
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_cuarto_juegos
+
+- triggers:
+    - trigger: state
+      entity_id: sensor.persiana_cuarto_ninos_ultima_orden
+      to: [subir, bajar, parar]
+      id: orden
+    - trigger: state
+      entity_id: sensor.persiana_cuarto_ninos_ultima_orden
+      to: [subir, bajar]
+      for:
+        seconds: "{{ states('number.persiana_cuarto_ninos_travel_time') | float(35) }}"
+      id: fin
+  actions:   # la macro una vez; en actions no hay `this`: el estado anterior se lee por su nombre
+    - variables:
+        r: "{% from 'persianas.jinja' import persiana %}{{ persiana(states('sensor.persiana_cuarto_ninos_posicion'), state_attr('sensor.persiana_cuarto_ninos_posicion', 'mov'), state_attr('sensor.persiana_cuarto_ninos_posicion', 't0'), trigger.to_state.state if trigger.id == 'orden' else '', states('number.persiana_cuarto_ninos_travel_time') | float(35), now().timestamp()) | from_json }}"
+  sensor:
+    - name: Persiana Cuarto Niños posición
+      unique_id: persiana_cuarto_ninos_posicion
+      default_entity_id: sensor.persiana_cuarto_ninos_posicion
+      unit_of_measurement: "%"
+      icon: mdi:window-shutter
+      state: "{{ r.pos }}"
+      attributes:
+        mov: "{{ r.mov }}"
+        t0: "{{ r.t0 }}"
+- cover:
+    - name: Persiana Cuarto Niños
+      unique_id: estado_persiana_cuarto_ninos
+      default_entity_id: cover.estado_persiana_cuarto_ninos
+      device_class: blind
+      state: >-
+        {% set m = state_attr('sensor.persiana_cuarto_ninos_posicion', 'mov') | int(0) %}{% set p = states('sensor.persiana_cuarto_ninos_posicion') | int(none) %}
+        {{ 'opening' if m > 0 else 'closing' if m < 0 else none if p is none else 'closed' if p <= 3 else 'open' }}
+      # Sin posición mientras se mueve: así siempre cambia al terminar y pisa el % que HA guarda solo al pedir un %.
+      position: "{{ none if state_attr('sensor.persiana_cuarto_ninos_posicion', 'mov') | int(0) != 0 else states('sensor.persiana_cuarto_ninos_posicion') | int(none) }}"
+      open_cover:
+        - action: cover.open_cover
+          target:
+            entity_id: cover.persiana_cuarto_ninos
+      close_cover:
+        - action: cover.close_cover
+          target:
+            entity_id: cover.persiana_cuarto_ninos
+      stop_cover:
+        - action: cover.stop_cover
+          target:
+            entity_id: cover.persiana_cuarto_ninos
+      # Ir a un % (Alexa, panel): se manda subir/bajar y se para al cabo de |destino − actual| × recorrido.
+      # Si no se sabe dónde está, primero baja del todo para tener referencia.
+      set_cover_position:
+        - variables:
+            travel: "{{ states('number.persiana_cuarto_ninos_travel_time') | float(35) }}"
+            inicio: "{{ now().timestamp() }}"
+        # Si es un "sube/baja" de Alexa sin % (a esta persiana o al grupo), va del todo en esa dirección.
+        - delay: 1
+        - variables:
+            alexa: "{{ states('sensor.alexa_ajuste_persiana') in ['cover.estado_persiana_cuarto_ninos', 'cover.persianas'] and (state_attr('sensor.alexa_ajuste_persiana', 't') | float(0) - inicio | float(0)) | abs < 5 }}"
+            position: "{{ (100 if position > state_attr('sensor.alexa_ajuste_persiana', 'antes') | float(50) else 0) if alexa else position }}"
+        - if: "{{ state_attr('sensor.persiana_cuarto_ninos_posicion', 'mov') | int(0) != 0 }}"
+          then:
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_cuarto_ninos
+            - delay: 1
+        - choose:
+            - conditions: "{{ position >= 97 }}"
+              sequence:
+                - action: cover.open_cover
+                  target:
+                    entity_id: cover.persiana_cuarto_ninos
+            - conditions: "{{ position <= 3 }}"
+              sequence:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_cuarto_ninos
+          default:
+            - if: "{{ states('sensor.persiana_cuarto_ninos_posicion') | int(none) is none }}"
+              then:
+                - action: cover.close_cover
+                  target:
+                    entity_id: cover.persiana_cuarto_ninos
+                - wait_template: "{{ states('sensor.persiana_cuarto_ninos_posicion') | int(-1) == 0 }}"
+                  timeout:
+                    seconds: "{{ travel + 10 }}"
+            - variables:
+                actual: "{{ states('sensor.persiana_cuarto_ninos_posicion') | float(0) }}"
+            - condition: template
+              value_template: "{{ (position - actual) | abs >= 3 }}"
+            - action: "{{ 'cover.open_cover' if position > actual else 'cover.close_cover' }}"
+              target:
+                entity_id: cover.persiana_cuarto_ninos
+            - delay:
+                seconds: "{{ ((position - actual) | abs / 100 * travel) | round(1) }}"
+            - action: cover.stop_cover
+              target:
+                entity_id: cover.persiana_cuarto_ninos
+
+- triggers:
+    - trigger: state
+      entity_id: sensor.persiana_dormitorio_principal_ultima_orden
+      to: [subir, bajar, parar]
+      id: orden
+    - trigger: state
+      entity_id: sensor.persiana_dormitorio_principal_ultima_orden
+      to: [subir, bajar]
+      for:
+        seconds: "{{ states('number.persiana_dormitorio_principal_travel_time') | float(35) }}"
+      id: fin
+  actions:   # la macro una vez; en actions no hay `this`: el estado anterior se lee por su nombre
+    - variables:
+        r: "{% from 'persianas.jinja' import persiana %}{{ persiana(states('sensor.persiana_dormitorio_principal_posicion'), state_attr('sensor.persiana_dormitorio_principal_posicion', 'mov'), state_attr('sensor.persiana_dormitorio_principal_posicion', 't0'), trigger.to_state.state if trigger.id == 'orden' else '', states('number.persiana_dormitorio_principal_travel_time') | float(35), now().timestamp(), true) | from_json }}"
+  sensor:
+    - name: Persiana Dormitorio Principal posición
+      unique_id: persiana_dormitorio_principal_posicion
+      default_entity_id: sensor.persiana_dormitorio_principal_posicion
+      unit_of_measurement: "%"
+      icon: mdi:window-shutter
+      state: "{{ r.pos }}"
+      attributes:
+        mov: "{{ r.mov }}"
+        t0: "{{ r.t0 }}"
+- cover:
+    - name: Persiana Dormitorio Principal
+      unique_id: estado_persiana_dormitorio_principal
+      default_entity_id: cover.estado_persiana_dormitorio_principal
+      device_class: blind
+      state: >-
+        {% set m = state_attr('sensor.persiana_dormitorio_principal_posicion', 'mov') | int(0) %}{% set p = states('sensor.persiana_dormitorio_principal_posicion') | int(none) %}
+        {{ 'opening' if m > 0 else 'closing' if m < 0 else none if p is none else 'closed' if p <= 3 else 'open' }}
+      # Sin posición mientras se mueve: así siempre cambia al terminar y pisa el % que HA guarda solo al pedir un %.
+      position: "{{ none if state_attr('sensor.persiana_dormitorio_principal_posicion', 'mov') | int(0) != 0 else states('sensor.persiana_dormitorio_principal_posicion') | int(none) }}"
+      open_cover:
+        - action: cover.open_cover
+          target:
+            entity_id: cover.persiana_dormitorio_principal
+      close_cover:
+        - action: cover.close_cover
+          target:
+            entity_id: cover.persiana_dormitorio_principal
+      stop_cover:
+        - action: cover.stop_cover
+          target:
+            entity_id: cover.persiana_dormitorio_principal
+      # Broken motor: if stopped halfway it falls by gravity, so it never stops halfway.
+      # A % goes all the way in the direction requested (lower → down, raise → up).
+      set_cover_position:
+        - variables:
+            actual: "{{ states('sensor.persiana_dormitorio_principal_posicion') | float(50) }}"
+            inicio: "{{ now().timestamp() }}"
+        # Si es un "sube/baja" de Alexa sin % (a esta persiana o al grupo), va del todo en esa dirección.
+        - delay: 1
+        - variables:
+            alexa: "{{ states('sensor.alexa_ajuste_persiana') in ['cover.estado_persiana_dormitorio_principal', 'cover.persianas'] and (state_attr('sensor.alexa_ajuste_persiana', 't') | float(0) - inicio | float(0)) | abs < 5 }}"
+            position: "{{ (100 if position > state_attr('sensor.alexa_ajuste_persiana', 'antes') | float(50) else 0) if alexa else position }}"
+        - if: "{{ position >= 97 or (position > 3 and position > actual) }}"
+          then:
+            - action: cover.open_cover
+              target:
+                entity_id: cover.persiana_dormitorio_principal
+          else:
+            - action: cover.close_cover
+              target:
+                entity_id: cover.persiana_dormitorio_principal
