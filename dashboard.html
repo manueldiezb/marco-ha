@@ -605,6 +605,126 @@ html.dark .bctl .chp { background: #3A322B; } .bctl .chp .ic { font-size: 34px; 
 .cfoot { margin-top: 6px; font-size: 16px; color: var(--soft); }
 .cchart { touch-action: pan-y; cursor: crosshair; }
 .cwait { height: 150px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 17px; }
+/* Coche: estado y acciones arriba, gasolina y mapa abajo */
+/* Ya no cabe en una pantalla: se desplaza en vertical como Ajustes (escena, cifras, salud/puertas/gasolina, mapas, ficha) */
+.ccg { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 430px 148px 452px 420px auto; gap: 20px;
+  overflow-y: auto; scrollbar-width: none; padding-bottom: 8px; }
+.ccg::-webkit-scrollbar { display: none; }
+.ccg > .tile { min-height: 0; overflow: hidden; } .ccg > .hero, .ccg > .pmap { grid-column: span 2; } .ccg > .kpis, .ccg > .ficha { grid-column: 1 / -1; }
+/* Gasolineras a menos de 20 min de casa: puntos del color de su precio, el precio escrito en las más baratas */
+.gmap .gdot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); z-index: 1; }
+.gmap .gfav { position: absolute; z-index: 3; transform: translate(-50%, calc(-100% - 12px)); padding: 4px 10px; border-radius: 10px; font-style: normal; white-space: nowrap; text-align: center;
+  background: var(--card); color: var(--ink); border: 2px solid var(--pc); box-shadow: 0 1px 4px rgba(34,29,24,.15); }
+.gmap .gfav.dn { transform: translate(-50%, 12px); } .gmap .gfav.r { transform: translate(12px, -50%); } .gmap .gfav.l { transform: translate(calc(-100% - 12px), -50%); }
+.gmap .gfav b { display: block; font-size: 14px; line-height: 18px; font-weight: 600; } .gmap .gfav span { display: block; font-size: 14px; line-height: 18px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.gmap .pin { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-width: 3px; box-shadow: 0 2px 6px rgba(34,29,24,.25); }
+.gmap .mtag { left: 12px; top: 12px; font-size: 14px; padding: 4px 10px; }
+/* Escena: el coche grande desde arriba (morro a la derecha), aparcada en su plaza; lo abierto o averiado en rojo y latiendo */
+:root { --cb1: #FFFFFF; --cb2: #E6DDD1; --cbl: #C9BBA9; --glass: #BFD9EA; --roof1: #44576A; --roof2: #1F2A33; --tyre: #2E2823; --bar: #FFF3CF; }
+html.dark { --cb1: #57504A; --cb2: #36302B; --cbl: #6A5F55; --glass: #4B6578; --roof1: #2E3B47; --roof2: #151B21; --tyre: #0F0D0B; --bar: #F2DFA6; }
+.hero { flex-direction: row !important; align-items: center; gap: 28px; padding: 22px 30px !important;
+  background: radial-gradient(120% 90% at 30% 50%, var(--tint) 0%, var(--card) 70%) !important; }
+.hero .carv { flex: 0 0 56%; position: relative; cursor: pointer; align-self: stretch; display: flex; align-items: center; }
+.carv .car { display: block; width: 100%; height: auto; }
+.carv .cst { display: none; }
+.carv .v3 { position: absolute; right: 6px; bottom: 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 14px;
+  background: var(--card); border: 1.5px solid var(--line); font-size: 15px; font-weight: 500; color: var(--soft); } .carv .v3 .ic { font-size: 18px; }
+.hero .hs { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hl { display: flex; align-items: center; gap: 14px; font-size: 44px; line-height: 50px; font-weight: 600; letter-spacing: -1.4px; }
+.hl .dot { width: 16px; height: 16px; box-shadow: 0 0 0 7px color-mix(in srgb, var(--dc) 20%, transparent); }
+.hsub { margin: 6px 0 0 30px; font-size: 21px; line-height: 27px; color: var(--soft); }
+.hchips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.hchip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px; background: rgba(var(--wash), .55); font-size: 17px; line-height: 20px; font-weight: 500; white-space: nowrap; }
+.hchip .ic { font-size: 19px; color: var(--soft); } .hchip.bad { background: var(--t-bad); color: var(--bad); } .hchip.bad .ic { color: var(--bad); }
+.haddr { display: flex; gap: 10px; margin-top: auto; padding-top: 18px; font-size: 17px; line-height: 23px; color: var(--soft); }
+.haddr .ic { font-size: 20px; flex: none; margin-top: 1px; }
+.pulse { animation: pulse 1.4s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .3; } }
+/* Cifras: cuatro bloques con anillo o icono */
+.kpis { flex-direction: row !important; align-items: center; padding: 0 !important; }
+.kpi { flex: 1; min-width: 0; display: flex; align-items: center; gap: 18px; padding: 0 28px; height: 100%; }
+.kpi + .kpi { border-left: 1.5px solid var(--line); }
+.kpi .ring { width: 76px; height: 76px; flex: none; }
+.ring circle { fill: none; stroke-width: 7; stroke-linecap: round; } .ring .rt { stroke: rgba(var(--wash), .9); }
+.ring text { font: 600 17px Geist, sans-serif; fill: var(--ink); }
+.kpi .ki { width: 76px; height: 76px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(var(--wash), .55); }
+.kpi .ki .ic { font-size: 34px; color: var(--soft); }
+.kpi .kl { font-size: 16px; line-height: 20px; color: var(--soft); font-weight: 500; }
+.kpi .kv { font-size: 34px; line-height: 40px; font-weight: 600; letter-spacing: -1px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.kpi .kv small { font-size: 18px; font-weight: 500; color: var(--soft); letter-spacing: 0; }
+.kpi .ks { font-size: 15px; line-height: 19px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Salud: esquema de luces y ruedas + avisos + clima (solo lectura) */
+.lamps { display: block; width: 100%; height: auto; margin: 10px 0 4px; }
+.hlist { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+.hlist .chk { min-height: 38px; font-size: 16px; line-height: 19px; gap: 9px; } .hlist .chk .ic { font-size: 20px; }
+.clim { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; }
+.clim span { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 14px; background: rgba(var(--wash), .45); font-size: 15px; font-weight: 500; color: var(--soft); white-space: nowrap; }
+.clim span.on { background: var(--t-cool); color: var(--ink); } .clim .dot { width: 9px; height: 9px; }
+/* Puertas y ventanillas */
+.doors { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 10px; margin-top: 14px; min-height: 0; }
+.door { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 10px 14px; border-radius: 18px; background: rgba(var(--wash), .4); min-width: 0; }
+.door b { display: flex; align-items: center; gap: 8px; font-size: 18px; line-height: 22px; font-weight: 600; }
+.door small { font-size: 14.5px; line-height: 18px; color: var(--soft); }
+.door.bad { background: var(--t-bad); } .door.bad small { color: var(--ink); }
+.door .dot { width: 9px; height: 9px; }
+/* Modo aparcacoches: no hay sensor de su estado, así que dos botones */
+.act.valet { cursor: default; flex-wrap: wrap; row-gap: 10px; padding: 14px 20px; } .act.valet > span:nth-child(2) { flex: 1; min-width: 0; }
+.act.valet .vb { display: flex; gap: 10px; width: 100%; } .vb .btn { flex: 1; min-height: 48px; font-size: 17px; border-radius: 16px; }
+#pg-coche .act:not(.valet) { min-height: 84px; }
+.ficha { padding: 2px 8px 6px; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; color: var(--muted); }
+.ficha b { font-weight: 600; color: var(--soft); }
+.chk { display: flex; align-items: center; gap: 14px; min-height: 46px; font-size: 20px; color: var(--soft); }
+.hsub + .chk { margin-top: 16px; }
+.chk .ic { font-size: 24px; color: var(--ok); }
+.chk.bad { color: var(--ink); font-weight: 600; } .chk.bad .ic { color: var(--bad); }
+.acts { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; margin-top: 14px; }
+.act { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 96px; padding: 0 20px; border: 1.5px solid var(--line); border-radius: 24px; cursor: pointer;
+  text-align: left; font-family: Geist, sans-serif; color: var(--ink); background: transparent; transition: transform .12s, opacity .2s; }
+.act .ai { width: 52px; height: 52px; flex: none; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: rgba(var(--wash), .6); }
+.act .ai .ic { font-size: 28px; }
+.act b { display: block; font-size: 22px; line-height: 28px; font-weight: 600; }
+.act small { display: block; font-size: 17px; line-height: 22px; font-weight: 500; color: var(--soft); }
+.act.main { background: var(--ink); border-color: var(--ink); color: var(--card); }
+.act.main small { color: color-mix(in srgb, var(--card) 72%, transparent); } .act.main .ai { background: color-mix(in srgb, var(--card) 14%, transparent); }
+.act.sent, .act:disabled { opacity: .5; pointer-events: none; }
+.acts .note { text-align: center; font-size: 17px; color: var(--soft); }
+.fuelc { gap: 10px; }
+.fuelc .fl { flex: none; display: flex; flex-direction: column; }
+.fuelc .fr { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.fuelc .fnote { margin-top: 12px; font-size: 18px; line-height: 24px; } .fuelc .gasb { margin-top: 0; }
+.fbar2 { height: 8px; margin-top: 14px; border-radius: 4px; overflow: hidden; background: rgba(var(--wash), .9); } .fbar2 i { display: block; height: 100%; border-radius: 4px; }
+.fnote { margin-top: 16px; font-size: 20px; line-height: 28px; color: var(--soft); } .fnote b { font-weight: 600; color: var(--ink); }
+.gasb { display: flex; align-items: center; gap: 12px; margin-top: auto; padding: 12px 14px; border-radius: 18px; background: rgba(var(--wash), .45); }
+.gasb .logo { width: 40px; height: 40px; } .gasb .gi { flex: 1; min-width: 0; font-size: 18px; line-height: 23px; font-weight: 600; }
+.gasb .gi small { display: block; font-size: 15px; font-weight: 500; color: var(--soft); }
+.gasb > b { font-size: 22px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: Geist, sans-serif; font-size: 14px; fill: var(--muted); }
+.mapc { padding: 0 !important; position: relative; }
+.map { position: absolute; inset: 0; overflow: hidden; background: rgba(var(--wash), .6); }
+.map img { position: absolute; width: 256px; height: 256px; }
+html.dark .map img { filter: invert(.9) hue-rotate(180deg) brightness(.9) contrast(.85); }
+.map .pin { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; z-index: 2; border-radius: 50%; background: var(--cool); border: 4px solid #fff;
+  box-shadow: 0 0 0 10px color-mix(in srgb, var(--cool) 22%, transparent), 0 2px 6px rgba(34,29,24,.25); }
+.map .park { position: absolute; display: flex; align-items: center; gap: 6px; margin: -12px 0 0 -12px; font-style: normal; white-space: nowrap; }
+.map .park.l { flex-direction: row-reverse; transform: translateX(calc(-100% + 24px)); }   /* cerca del borde derecho: etiqueta a la izquierda */
+.map .park b { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--soft); color: var(--card);
+  font-size: 13px; font-weight: 600; border: 2px solid var(--card); }
+.map .park span { padding: 2px 8px; border-radius: 8px; background: var(--card); color: var(--ink); font-size: 14px; font-weight: 500; box-shadow: 0 1px 4px rgba(34,29,24,.12); }
+.mtag { position: absolute; left: 16px; top: 16px; padding: 6px 12px; border-radius: 12px; background: var(--card); font-size: 15px; font-weight: 500; color: var(--soft); box-shadow: 0 1px 6px rgba(34,29,24,.1); }
+.map .osm { position: absolute; right: 8px; top: 6px; font-size: 11px; color: #555; background: #fff9; padding: 0 4px; border-radius: 4px; }
+.mlab { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 20px; background: var(--card);
+  box-shadow: 0 4px 14px rgba(34,29,24,.12); font-size: 20px; line-height: 26px; font-weight: 600; }
+.mlab > .ic { font-size: 26px; color: var(--soft); } .mlab small { display: block; font-size: 16px; font-weight: 500; color: var(--soft); }
+/* iPad en vertical: dos columnas; la escena, las cifras y los mapas a lo ancho */
+body.p .ccg { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 400px 450px 260px 510px 420px 420px auto; }
+body.p .ccg > * { order: 5; } body.p .ccg > .hero { order: 1; } body.p .ccg > :nth-child(2) { order: 2; } body.p .ccg > :nth-child(5) { order: 3; } body.p .ccg > .kpis { order: 4; }
+body.p .ccg > .hero, body.p .ccg > .gmap, body.p .ccg > .pmap { grid-column: 1 / -1; }
+body.p .kpis { display: grid; grid-template-columns: 1fr 1fr; } body.p .kpi:nth-child(3) { border-left: 0; } body.p .kpi:nth-child(n+3) { border-top: 1.5px solid var(--line); }
+body.m .ccg { display: flex; flex-direction: column; } body.m .ccg > .tile { flex: none; overflow: visible; }
+body.m .hero, body.m .fuelc { flex-direction: column !important; align-items: stretch; }
+body.m .hero .carv { flex: none; } body.m .mapc { height: 360px; } body.m .fuelc .fr { height: 200px; }
+body.m .kpis { flex-direction: column !important; align-items: stretch; } body.m .kpi { padding: 14px 20px; } body.m .kpi + .kpi { border-left: 0; border-top: 1.5px solid var(--line); }
+body.m .doors { grid-auto-rows: auto; }
 /* Ajustes */
 .ag { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: max-content; gap: 20px; align-content: start; align-items: start; overflow-y: auto; scrollbar-width: none; }
 .ag::-webkit-scrollbar { display: none; }   /* max-content: con body.p .tile { min-height: 0 } las filas se encogían y las tarjetas se montaban (iPad vertical) */
@@ -756,16 +876,20 @@ html.dark .pc::before { filter: invert(1); mix-blend-mode: screen; opacity: .18;
   <div class="row r3">
     <div class="swap" style="flex:1"><div class="ssw" id="swap"><div class="tile rm" id="rm"></div></div><div class="dots" id="sdots" hidden></div></div>
     <div class="hbox" style="flex:1"><div class="hsw" id="hsw"><div class="tile" id="home" onclick="nav('casa')"></div><div class="tile pc" id="plane" hidden></div></div><div class="dots" id="hdots"></div></div>
-    <div class="eswap" style="flex:1"><div class="ssw" id="eswap"><div class="tile energy" id="energy"></div><div class="tile ora off" id="ora" onclick="nav('oracion')" hidden></div></div><div class="dots" id="edots"></div></div>
+    <div class="eswap" style="flex:1"><div class="ssw" id="eswap"><div class="tile energy" id="energy" onclick="CONFIG.coche && nav('coche')"></div><div class="tile ora off" id="ora" onclick="nav('oracion')" hidden></div></div><div class="dots" id="edots"></div></div>
   </div>
   <div class="pg" id="pg-casa"></div>
   <div class="pg" id="pg-ajustes"></div>
+  <div class="pg" id="pg-coche"></div>
   <div class="pg" id="pg-oracion"></div>
+  <div class="pg" id="pg-compra"></div>
   <div class="pg" id="pg-tareas"></div>
   <nav id="rail">
     <div class="ri on" data-p="hoy" onclick="nav('hoy')"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/><rect x="7" y="13.5" width="4" height="4" rx=".8"/></svg>Hoy</div>
     <div class="ri" data-p="casa" onclick="nav('casa')"><svg viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11.5h13V9"/><path d="M10 20.5V15h4v5.5"/></svg>Casa</div>
+    <div class="ri" data-p="coche" onclick="nav('coche')"><svg viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>Coche</div>
     <div class="ri" data-p="oracion" onclick="nav('oracion')"><svg viewBox="0 0 24 24"><path d="M12 2.5v19M6.5 8h11"/></svg>Oración</div>
+    <div class="ri" data-p="compra" onclick="nav('compra')"><svg viewBox="0 0 24 24"><circle cx="9.5" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/><path d="M2.5 3.5h2.8l2.5 12.5h11.4l2.3-9H6.2"/></svg>Compra</div>
     <div class="ri" data-p="tareas" onclick="nav('tareas')"><svg viewBox="0 0 24 24"><path d="M10 6h10.5M10 12h10.5M10 18h10.5"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>Tareas</div>
     <div class="ri" data-p="ajustes" onclick="nav('ajustes')"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Ajustes</div>
     <div id="rclock"><b>--</b><b>--</b></div>
@@ -822,11 +946,21 @@ const CONFIG = {
   // El IDEESS de cada gasolinera: https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/FiltroProvincia/28
   provincia: '28',
   gasolineras: [],
+  mercadona: false,                       // página Compra: el carrito compartido de la app de Mercadona (packages/mercadona.yaml + mercadona.py)
+  // Coche (null = sin coche). Cada dato tiene una clave (las de la integración kia_uvo / Hyundai-Kia Bluelink, lista en el README).
+  // La entidad es <dominio>.<prefijo>_<clave> o la que pongas en entidades: { 'sensor.fuel_level': 'sensor.mi_coche_combustible' }.
+  // Lo que no exista en HA no sale.
+  coche: null,   // { nombre: 'Mi coche', prefijo: '', entidades: {}, deposito: 50, modelo3d: '' (id de Sketchfab) }
 };
 // ═══════════════════════════════════════════════════════
 
 const CALENDARS = { ...CONFIG.calendarios, ...(CONFIG.cumpleanos && { [CONFIG.cumpleanos]: ['Cumpleaños', '#E5579A'] }) };
 const BDAYS = CONFIG.cumpleanos;
+const COCHE = CONFIG.coche;
+const carId = (dom, k) => COCHE ? COCHE.entidades?.[`${dom}.${k}`] || (COCHE.prefijo ? `${dom}.${COCHE.prefijo}${k ? '_' + k : ''}` : undefined) : undefined;
+const esCoche = id => !!COCHE && (Object.values(COCHE.entidades || {}).includes(id) || !!COCHE.prefijo && id.split('.')[1]?.startsWith(COCHE.prefijo + '_'));
+// Autonomía: algunas integraciones la dan en «Autonomía total» y otras en la de combustible; se usa la que tenga número
+const autonomia = get => [carId('sensor', 'autonomia_total'), carId('sensor', 'fuel_driving_range')].map(id => parseFloat(get(id)?.state)).find(v => !isNaN(v));
 const HEAT = CONFIG.clima.calefaccion, AIRE = CONFIG.clima.aire;
 const CLIMA = { t: CONFIG.clima.t, h: CONFIG.clima.h, o: CONFIG.clima.fuera, d: CONFIG.clima.dormitorio };
 const fotoDe = ev => CONFIG.fotos[ev.cal];
@@ -1113,6 +1247,12 @@ function tick() {
   if (document.body.classList.contains('sleep') && $('sclk').textContent !== hm(now)) paintSleep(now);
 }
 
+// Ruta más rápida de Waze (duration en minutos): la usan las gasolineras
+async function waze(origin, destination) {
+  const routes = (await ha('services/waze_travel_time/get_travel_times?return_response', { origin, destination, region: 'eu', realtime: true }, 'waze')).service_response?.routes || [];
+  if (!routes.length) throw new Error('waze sin ruta');
+  return routes.reduce((a, b) => (b.duration < a.duration ? b : a));
+}
 // --- Tiempo (Open-Meteo) ---
 const rain = p => `<div class="rainp ${p >= 40 ? 'hi' : ''}">💧 ${p ?? 0} %</div>`;
 async function loadWeather() {
@@ -1253,6 +1393,12 @@ function openTbd() {
   $('tbd').querySelector('.box').innerHTML = `<iframe src="https://lostalentos.vercel.app/tablero/${code}" title="Talentos"></iframe><b class="x" onclick="closeTbd()">✕</b>`;
   $('tbd').classList.add('on');
   clearTimeout(tbdTimer); tbdTimer = setTimeout(closeTbd, 3 * 6e4);    // ponytail: los toques dentro del iframe no llegan aquí; se cierra a los 3 min
+}
+// Modelo 3D del coche (Sketchfab, CONFIG.coche.modelo3d) en la misma ventana; solo mientras se mira: WebGL siempre en marcha calentaría el iPad
+function open3D() {
+  $('tbd').querySelector('.box').innerHTML = `<iframe src="https://sketchfab.com/models/${encodeURIComponent(COCHE.modelo3d)}/embed?autostart=1&ui_infos=0&ui_controls=0&ui_stop=0&ui_help=0&ui_settings=0&ui_vr=0&ui_fullscreen=0&ui_annotations=0" title="Coche en 3D" allow="autoplay; xr-spatial-tracking"></iframe><b class="x" onclick="closeTbd()">✕</b>`;
+  $('tbd').classList.add('on');
+  clearTimeout(tbdTimer); tbdTimer = setTimeout(closeTbd, 2 * 6e4);
 }
 function closeTbd() { clearTimeout(tbdTimer); $('tbd').classList.remove('on'); $('tbd').querySelector('.box').innerHTML = ''; }   // fuera el iframe: deja de sondear
 function setBal(cell, n) {
@@ -1509,7 +1655,7 @@ async function loadHome() {
   const isLight = s => s.entity_id.startsWith('light.') && !s.attributes.entity_id && !CONFIG.lucesIgnorar.some(p => s.entity_id.startsWith(p));
   const lights = all.filter(s => isLight(s) && s.state === 'on');
   // Lo que escucha el push: aviones, clima, todas las luces (sin grupos) y las persianas
-  homeWatch = [...(CONFIG.aviones ? [PLANE, FOLLOW, PREV] : []), HEAT, AIRE, ...Object.values(CLIMA), ...CONFIG.persianas,
+  homeWatch = [...(CONFIG.aviones ? [PLANE, FOLLOW, PREV] : []), HEAT, AIRE, ...Object.values(CLIMA), ...CONFIG.persianas, ...all.map(s => s.entity_id).filter(esCoche),
     ...all.filter(isLight).map(s => s.entity_id)].filter(Boolean);
   pills.push(lights.length ? cell('💡', 'Luces', lights.length === 1 ? '1 encendida' : lights.length + ' encendidas', '#C98A0E') : cell('💡', 'Luces', 'Apagadas', null));
   if (CONFIG.talentos) talentos = talentosFrom(all);
@@ -1531,7 +1677,7 @@ async function loadHome() {
   }
   casaSt = st; casaLights = all.filter(isLight);
   if (forecast) renderWeather();
-  renderCasa();
+  renderCasa(); renderCoche();
 
   $('home').innerHTML = `<div class="th">🏡<span style="color:#E8743B">HOGAR</span>
       <div class="big">${temp != null ? coma(temp) + '°' : '—'}${hum != null ? `<small> · ${Math.round(hum)} % humedad</small>` : ''}</div></div>
@@ -1544,12 +1690,14 @@ let page = 'hoy', pageTimer = null;
 const hoyVisible = () => page === 'hoy' && !document.hidden && !document.body.classList.contains('sleep');
 function nav(p) {
   page = p;
-  document.body.classList.remove('pg-casa', 'pg-ajustes', 'pg-oracion', 'pg-tareas');
+  document.body.classList.remove('pg-casa', 'pg-ajustes', 'pg-coche', 'pg-oracion', 'pg-compra', 'pg-tareas');
   if (p !== 'hoy') document.body.classList.add('pg-' + p);
   document.querySelectorAll('#rail .ri[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p === 'casa') renderCasa(true);
-  if (p === 'ajustes') { renderAjustes(); if (CONFIG.aviones) loadVuelos().then(() => page === 'ajustes' && renderAjustes(), () => {}); }   // vuelos seguidos
+  if (p === 'ajustes') { merEdit = false; renderAjustes(); Promise.allSettled([CONFIG.mercadona && loadCart(), CONFIG.aviones && loadVuelos()]).then(() => page === 'ajustes' && renderAjustes()); }   // Mercadona y vuelos seguidos
   if (p === 'oracion') renderOracion();
+  if (p === 'compra') { renderCompra(); loadCompra(); }
+  if (p === 'coche') { renderCoche(); if (Date.now() - cocheHistAt > 30 * 6e4) loadCocheHist().then(renderCoche, () => {}); }
   if (p === 'tareas') { renderTareas(); loadTareas(true); }
   if (document.body.classList.contains('m')) scrollTo(0, 0);
 }
@@ -1846,6 +1994,53 @@ function renderCasa(force) {
   fitClima();
 }
 
+// --- Compra: el carrito de Mercadona que compartimos en la app. Habla con HA (shell_command.marco_mercadona →
+// /config/marco/mercadona.py), que solo sabe leer y cambiar el carrito: ni pedir ni pagar. Al escribir sugiere primero
+// lo comprado en los últimos pedidos (el índice se filtra aquí, al instante) y debajo el catálogo de Mercadona.
+const cmp = { cart: null, hab: null, habAt: 0, cat: [], catQ: '', err: '', at: 0, by: {}, chain: Promise.resolve(),
+  ops: 0, pend: {}, ocultos: new Set() };
+async function mer(cmd, extra = {}) {
+  const r = await ha('services/shell_command/marco_mercadona?return_response', { data: b64({ cmd, ...extra }) }, 'Compra', 65e3);   // shell_command llega a 60 s
+  let out; try { out = JSON.parse(r.service_response?.stdout); } catch { out = { error: 'Mercadona no responde' }; }
+  if (out.auth) cmp.err = out.error; else if (out.ok) cmp.err = '';
+  if (!out.ok) throw new Error(out.error || 'Mercadona no responde');
+  return out;
+}
+const CMP_STOP = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'en', 'y', 'a', 'al', 'un', 'una', 'para', 'con']);
+const CMP_SYN = { lechuga: ['ensalada', 'cogollo'], refresco: ['fresh'], cerveza: ['lager'] };   // como lo llama Mercadona
+// Todas las palabras tienen que empezar alguna palabra del nombre (así «lech semi» ya encuentra la leche); plural fuera.
+// Orden: lo más comprado primero y, a igualdad, lo último que se compró.
+function cmpMatch(q, items) {
+  const ws = norm(q).split(' ').filter(w => w && !CMP_STOP.has(w)).map(w => w.length > 4 ? w.replace(/(es|s)$/, '') : w);
+  if (!ws.length) return [];
+  return items.filter(it => { const t = norm(it.name).split(' '); return ws.every(w => [w, ...(CMP_SYN[w] || [])].some(v => t.some(x => x.startsWith(v)))); })
+    .sort((a, b) => b.times - a.times || (b.last || '').localeCompare(a.last || ''));
+}
+const cmpId = id => String(id).replace(/[^\w.-]/g, '');
+const cmpHave = id => cmp.cart?.items.find(i => i.id === id)?.qty || 0;
+const cmpIndex = list => list.forEach(({ qty, ...p }) => cmp.by[p.id] = { ...cmp.by[p.id], ...p });
+const euro = v => v == null ? '' : v.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+const cmpQty = (p, q) => p.sm ? q.toLocaleString('es-ES', { maximumFractionDigits: 3 }) + ' kg' : q;
+function cmpRow(p, inCart) {
+  const id = cmpId(p.id), have = cmpHave(p.id);
+  // «Habitual» = de los 12 más comprados; en el carrito y al buscar (en «Lo de siempre» sobra)
+  const tag = (inCart || $('cmq')?.value.trim()) && cmp.hab?.items.slice(0, 12).some(h => h.id === p.id) ? '<span class="tg">Habitual</span>' : '';
+  const sub = p.fmt || '';
+  const end = inCart
+    ? `<button class="rb" onclick="cmpChange('${id}',-1)" aria-label="Menos">${ic('minus')}</button><div class="q">${cmpQty(p, have)}</div><button class="rb" onclick="cmpChange('${id}',1)" aria-label="Más">${ic('plus')}</button>`
+    : `${have ? `<span class="in">${cmpQty(p, have)} en la lista</span>` : ''}<button class="rb" aria-label="Añadir">${ic('plus')}</button>`;
+  const sw = !inCart && cmp.hab?.items.some(h => h.id === p.id) ? ' sw' : '';
+  return `<div class="cpr${sw}" data-id="${id}"${inCart ? '' : ` onclick="cmpChange('${id}',1,1)"`}>${p.img ? `<img src="${esc(p.img)}" loading="lazy" alt="">` : '<i class="noimg"></i>'}
+    <div class="cn"><b>${esc(p.name)}</b><small>${tag}${esc(sub)}</small></div><div class="pr">${euro(p.price)}</div>${end}</div>`;
+}
+function renderCompra() {
+  const el = $('pg-compra');
+  if (!el.firstChild) el.innerHTML = `<div class="pgh"><h1>Compra</h1><div class="pgs" id="cms"></div>
+      <button class="btn" onclick="loadCompra(true)">${ic('refresh')}Actualizar</button></div>
+    <div class="cmp"><div class="tile"><input class="cmq" id="cmq" type="search" placeholder="¿Qué falta?" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" oninput="cmpType()"><div id="cmr"></div></div>
+      <div class="tile"><div class="ct">${ic('cart')}En la lista<span class="ctx" id="cmt"></span></div><div id="cml"></div></div></div>`;
+  paintCompra();
+}
 // Pinta una lista reutilizando las filas que no cambian: sin recrear sus fotos (que parpadeaban) ni saltos.
 // rows = [[clave, html]]; si una fila cambia (la cantidad), conserva su <img> ya cargada
 function patch(box, rows) {
@@ -1861,6 +2056,127 @@ function patch(box, rows) {
   }));
 }
 const cmpMsg = (k, t) => [k, `<div class="cme">${esc(t)}</div>`];
+function paintCompra() {
+  const c = cmp.cart;
+  if (!$('cml')) return;
+  $('cms').textContent = c ? `${c.count} ${c.count === 1 ? 'producto' : 'productos'} · ${euro(c.total)}` : '';
+  $('cmt').textContent = c?.items.length ? euro(c.total) : '';
+  // lo último que se añade, arriba (Mercadona guarda las líneas en el orden en que entran)
+  patch($('cml'), c ? ([...c.items].reverse().map(p => ['c' + p.id, cmpRow(p, true)]).concat(c.items.length ? [] : [cmpMsg('vacia', 'La lista está vacía')]))
+    : [cmpMsg('err', cmp.err || 'Cargando…')]);
+  const q = $('cmq').value.trim(), hab = (cmp.hab?.items || []).filter(p => !cmp.ocultos.has(p.id));
+  const mine = q ? cmpMatch(q, hab).slice(0, 8) : hab.filter(p => !cmpHave(p.id)).slice(0, 12);   // lo de siempre: sin lo que ya está en la lista
+  const rows = cmp.err ? [cmpMsg('err', cmp.err)] : [];
+  if (mine.length) rows.push(['h1', `<div class="cmh">${q ? 'Lo que soléis comprar' : 'Lo de siempre'}</div>`], ...mine.map(p => ['m' + p.id, cmpRow(p)]));
+  if (q.length >= 3) {
+    const ids = new Set(mine.map(p => p.id)), cat = cmp.catQ === q ? cmp.cat.filter(p => !ids.has(p.id)) : null;
+    rows.push(['h2', '<div class="cmh">Del catálogo</div>'], ...(cat ? cat.length ? cat.map(p => ['k' + p.id, cmpRow(p)]) : [cmpMsg('nada', 'Nada más con ese nombre')] : [cmpMsg('busca', 'Buscando…')]));
+  } else if (q && !mine.length) rows.push(cmpMsg('sigue', 'Sigue escribiendo para buscar en todo Mercadona'));
+  else if (!cmp.hab && !cmp.err) rows.push(cmpMsg('carga', 'Cargando lo de siempre…'));
+  patch($('cmr'), rows);
+  fitHab();
+}
+// Lo de siempre (sin buscar): de los 12, solo los que caben sin desplazar, en la tarjeta o, si la página crece (iPad
+// vertical, iPhone), en la pantalla. Al buscar, todos los resultados, con scroll
+function fitHab() {
+  const box = $('cmr'), tile = box?.parentNode, rows = [...(box?.children || [])].filter(n => n.dataset.k?.startsWith('m'));
+  rows.forEach(n => n.style.display = '');
+  if (!tile || $('cmq').value.trim() || !tile.offsetHeight) return;
+  tile.scrollTop = 0;
+  const rail = $('rail').getBoundingClientRect();   // en el iPhone, la barra de abajo tapa
+  // ponytail: la última fila puede comerse el margen interior de abajo (22 px) salvo 6: ya lleva su propio respiro.
+  // Exigir el margen entero dejaba fuera filas que se veían caber (14-11)
+  const bottom = Math.min(tile.getBoundingClientRect().bottom - 6,
+    tile.closest('.cmp').getBoundingClientRect().bottom, innerHeight, rail.top > innerHeight / 2 ? rail.top : innerHeight);
+  rows.forEach(n => { if (n.getBoundingClientRect().bottom > bottom + 1) n.style.display = 'none'; });
+}
+addEventListener('resize', () => page === 'compra' && fitHab());
+function cmpType() {
+  paintCompra(); clearTimeout(cmpType.t);
+  const q = $('cmq').value.trim();
+  if (q.length >= 3) cmpType.t = setTimeout(() => mer('buscar', { q })
+    .then(r => { cmpIndex(r.items); cmp.cat = r.items; cmp.catQ = q; paintCompra(); }, e => toast(e.message)), 300);
+}
+// Lecturas y cambios del carrito van en fila: así una lectura vieja no pisa un cambio que aún no ha llegado
+function loadCart() {
+  cmp.at = Date.now();
+  return cmp.chain = cmp.chain.then(() => mer('lista')).then(cmpCart, e => { cmp.err ||= e.message; }).then(paintCompra);
+}
+function loadCompra(force) {
+  loadCart();
+  if (!force && Date.now() - cmp.habAt < 3600e3) return;
+  cmp.habAt = Date.now();
+  // Lo de siempre: al momento la última lista guardada; la nueva tarda unos segundos (HA mira Gmail y Mercadona)
+  if (!cmp.hab) try { cmp.hab = JSON.parse(store.get('cmpHab')); if (cmp.hab) { cmpIndex(cmp.hab.items); paintCompra(); } } catch {}
+  mer('habituales').then(r => { cmp.hab = r; cmpIndex(r.items); store.set('cmpHab', JSON.stringify(r)); paintCompra(); }, () => { cmp.habAt = 0; paintCompra(); });
+}
+// Lo que dice Mercadona solo se pinta si no queda ningún cambio por mandar ni por contestar: así un toque rápido
+// no ve volver atrás el número con una respuesta vieja
+function cmpCart(r) { if (!cmp.ops) { cmp.cart = r; cmpIndex(r.items); } }
+// +/−: se ve al momento. Los toques seguidos en un producto se juntan (0,6 s) y van a Mercadona en una sola llamada.
+// Por debajo del mínimo, sale de la lista
+function cmpChange(id, sign, fromSearch) {
+  const p = cmp.by[id], c = cmp.cart;
+  if (!p || !c) return;
+  const have = cmpHave(id), delta = sign > 0 ? (have ? p.step : Math.max(p.min, p.step)) : -p.step;
+  let after = Math.round((have + delta) * 1000) / 1000;
+  if (after < p.min - 1e-6) after = 0;
+  const i = c.items.findIndex(x => x.id === id);
+  if (!after) { if (i >= 0) c.items.splice(i, 1); }
+  else if (i >= 0) c.items[i] = { ...c.items[i], qty: after };
+  else { c.items.push({ ...p, qty: after }); toast('Añadido: ' + p.name); }
+  c.count = c.items.length;
+  c.total = Math.round(c.items.reduce((t, x) => t + (x.price || 0) * x.qty, 0) * 100) / 100;   // aproximado hasta que conteste
+  if (fromSearch) { $('cmq').value = ''; clearTimeout(cmpType.t); }   // añadido desde el buscador: listo para el siguiente
+  paintCompra();
+  const pd = cmp.pend[id] ||= (cmp.ops++, { delta: 0 });
+  pd.delta = Math.round((pd.delta + after - have) * 1000) / 1000;
+  clearTimeout(pd.t);
+  pd.t = setTimeout(() => {
+    delete cmp.pend[id];
+    const d = pd.delta;
+    cmp.chain = cmp.chain.then(() => d ? mer('cambiar', { id, delta: d, min: p.min }) : null)
+      .then(r => { cmp.ops--; r && cmpCart(r); },
+        e => { cmp.ops--; toast(e.message); return cmp.ops ? null : mer('lista').then(cmpCart, () => {}); })
+      .then(paintCompra);
+  }, 600);
+}
+// Lo de siempre: deslizar una fila a la izquierda la quita de los habituales (en HA, para todos); se puede deshacer
+function cmpHide(id, volver) {
+  cmp.ocultos[volver ? 'delete' : 'add'](id);
+  store.set('cmpOcultos', JSON.stringify([...cmp.ocultos]));
+  paintCompra();
+  mer('ocultar', { id, volver }).catch(e => toast(e.message));
+  if (!volver) toast('Quitado de lo de siempre', () => cmpHide(id, true));
+}
+try { JSON.parse(store.get('cmpOcultos') || '[]').forEach(id => cmp.ocultos.add(id)); } catch {}
+(() => {
+  let row = null, x0 = 0, y0 = 0, dx = 0, dir = null;
+  const end = () => {
+    if (!row) return;
+    const r = row; row = null;
+    if (dir === 'x' && dx < -90) { r.classList.add('gone'); setTimeout(() => cmpHide(r.dataset.id), 250); }
+    else r.style.transform = '';
+    if (dir === 'x') swiped = Date.now();
+  };
+  let swiped = 0;   // el clic que llega al soltar tras deslizar no añade el producto
+  document.addEventListener('click', e => { if (Date.now() - swiped < 400) { e.stopPropagation(); e.preventDefault(); } }, true);
+  document.addEventListener('pointerdown', e => {
+    const r = e.target.closest('#cmr .cpr.sw');
+    if (!r || e.target.closest('button')) return;
+    row = r; x0 = e.clientX; y0 = e.clientY; dx = 0; dir = null;
+  });
+  document.addEventListener('pointermove', e => {
+    if (!row) return;
+    dx = e.clientX - x0;
+    dir ||= Math.abs(dx) > 12 ? 'x' : Math.abs(e.clientY - y0) > 12 ? 'y' : null;
+    if (dir === 'y') { row = null; return; }
+    if (dir === 'x') row.style.transform = `translateX(${Math.min(0, dx)}px)`;
+  });
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', () => { if (row) { row.style.transform = ''; row = null; } });
+})();
+setInterval(() => page === 'compra' && !document.hidden && !cmp.ops && loadCart(), 6e4);   // lo que se añade desde los móviles
 // --- Tareas: una lista todo.* de HA (CONFIG.tareas). Se ve, se tacha y se apunta.
 // ponytail: una sola lista fija; si hacen falta más, pastillas para elegir ---
 const tar = { id: CONFIG.tareas, all: null, items: null, hechas: [], fuera: new Map(), err: '', ops: 0, edit: null, fecha: '', hora: '' };
@@ -2027,6 +2343,15 @@ async function tarGuardar(e) {
   tar.ops--; loadTareas();
 }
 setInterval(() => CONFIG.tareas && ['tareas', 'hoy'].includes(page) && !document.hidden && !tar.ops && !tar.edit && loadTareas(), 6e4);   // lo que se apunta desde los móviles
+let merEdit = false;
+function merConnect(b) {
+  const dato = $('mou').value.trim();
+  if (!dato) return toast('Pega primero el MO-user');
+  b.classList.add('busy');
+  mer('sesion', { dato }).then(r => { toast('Mercadona conectada' + (r.name ? ': ' + r.name : '')); merEdit = false; cmp.habAt = 0; return loadCart(); },
+    e => toast(e.message)).finally(() => page === 'ajustes' && renderAjustes());
+}
+
 // --- Ajustes ---
 function renderAjustes() {
   const seg = (k, opts) => `<div class="chs seg">${opts.map(([v, l]) => `<button class="chp${AJ[k] === v ? ' on' : ''}" onclick="setAJ(this)" data-k="${k}" data-v='${JSON.stringify(v)}'>${l}</button>`).join('')}</div>`;
@@ -2050,6 +2375,13 @@ function renderAjustes() {
         <div class="ar"><input class="cmq sm" id="vq" placeholder="De quién (opcional)" autocomplete="off"><input class="cmq sm" id="vm" placeholder="Matrícula (opcional)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"></div>
         <div class="ar" style="justify-content:flex-end"><button class="btn" onclick="addVuelo(this)">Guardar</button></div>
         <div class="mhelp">Se guardan en Home Assistant: valen para el iPad y el iPhone. Se quitan solos al aterrizar. La matrícula solo hace falta si aún no sale sola: la que dé AeroDataBox manda.</div></div>` : ''}
+      </div>
+      ${CONFIG.mercadona ? `      <div class="tile tt" style="--tint:var(--t-ok);--tc:var(--ok)"><div class="ct">${ic('cart')}Mercadona</div>
+        ${row(cmp.err ? 'Sin conectar' : cmp.cart ? 'Conectada' : 'Comprobando…', cmp.cart && !cmp.err && !merEdit ? '<button class="btn" onclick="merEdit=true;renderAjustes()">Reconfigurar</button>' : '',
+          cmp.err || 'Se guarda en Home Assistant: vale para todos los dispositivos')}
+        ${cmp.err || merEdit ? `<div class="ar"><input class="cmq sm" id="mou" placeholder="Pega aquí el MO-user" autocomplete="off" autocorrect="off" spellcheck="false"><button class="btn" onclick="merConnect(this)">Conectar</button></div>
+        <div class="mhelp">En el Mac, en tienda.mercadona.es con la sesión abierta: Consola → <code>copy(localStorage.getItem('MO-user'))</code> y pégalo aquí.</div>` : ''}</div>
+` : ''}
       </div>
       <div class="agc">
       <div class="tile tt" style="--tint:var(--t-night);--tc:var(--night)"><div class="ct">${ic('moon')}Noche</div>
@@ -2102,6 +2434,276 @@ function logout(el) {
   fetch('/auth/revoke', form({ token: refreshTok })).catch(() => {});
   refreshTok = null; token = null; store.set('ha_refresh', '');
   nav('hoy'); showLogin();
+}
+
+// --- Coche: lo que se quiere saber desde la cocina. ¿Está bien y cerrado? ¿Me llega la gasolina? ¿Dónde está?
+// Y las órdenes útiles: cerrar/abrir y ventanillas. Datos de loadHome (casaSt) + 14 días de historial.
+// ponytail: capacidad del depósito para «llenar ≈ X €» (CONFIG.coche.deposito; si no, 50 l)
+const TANK_L = COCHE?.deposito || 50;
+const car = (dom, k) => casaSt[carId(dom, k)];
+const on = k => car('binary_sensor', k)?.state === 'on';
+const ago = t => { const m = Math.round((Date.now() - t) / 6e4); return isNaN(m) ? '' : m < 1 ? 'ahora mismo' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
+const kmFmt = v => Math.round(v).toLocaleString('es-ES');
+const WINS = ['front_left_window', 'front_right_window', 'back_left_window', 'back_right_window'];
+let cocheHist = null, cocheHistAt = 0;
+async function loadCocheHist() {
+  const ids = [carId('sensor', `fuel_level`), carId('sensor', `odometer`)];
+  cocheHist = serie(await historia(ids, 14));
+  // Dónde ha aparcado: el coche solo da su posición al aparcar (no hay recorridos). Con atributos y también los cambios
+  // que solo mueven la posición; posiciones a menos de 150 m de la anterior cuentan como la misma
+  const loc = (await historia([carId('device_tracker', `location`)], 14, '&significant_changes_only=0').catch(() => []))[0] || [];
+  cocheHist.parks = [];
+  for (const e of loc) {
+    const la = e.attributes?.latitude, lo = e.attributes?.longitude, prev = cocheHist.parks.at(-1);
+    if (la == null) continue;
+    if (prev && km(prev.la, prev.lo, la, lo) < .15) continue;
+    cocheHist.parks.push({ la, lo, t: Date.parse(e.last_updated || e.last_changed) });
+  }
+  cocheHistAt = Date.now();
+}
+// Gasolina: 14 días atrás (curva suave; los repostajes suben de golpe) y 7 adelante (previsión a puntos al ritmo de gasto)
+function fuelTrend(pts, lvl, rate, H = 210) {
+  const W = 560, T = 14, t0 = Date.now() - T * 864e5, now = Date.now();
+  const X = t => (t - t0) / ((T + 7) * 864e5) * W, Y = v => 12 + (1 - v / 100) * (H - 12);
+  const p = [];
+  for (const e of pts || []) {
+    const t = Math.max(t0, e.t), prev = p.at(-1);
+    if (prev && e.v - prev.v > 10 && t - 36e5 > prev.t + 6e4) p.push({ v: prev.v, t: t - 36e5 });   // justo antes de repostar
+    if (!prev || t > prev.t + 6e4) p.push({ v: e.v, t }); else prev.v = e.v;
+  }
+  if (!isNaN(lvl) && (!p.length || now > p.at(-1).t + 6e4)) p.push({ v: lvl, t: now });
+  if (p.length < 2) return '';
+  const xs = p.map(e => X(e.t)), ys = p.map(e => Y(e.v)), line = smoothPath(xs, ys);
+  const fills = p.filter((e, k) => k && e.v - p[k - 1].v > 10);
+  const dd = rate > 0 ? Math.min(7, lvl / rate) : 0;
+  const lab = (t, txt, a = 'middle') => `<text x="${X(t)}" y="${H + 22}" text-anchor="${a}">${txt}</text>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H + 28}"><defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C99236" stop-opacity=".22"/><stop offset="1" stop-color="#C99236" stop-opacity="0"/></linearGradient></defs>
+    <line x1="0" x2="${W}" y1="${Y(20)}" y2="${Y(20)}" stroke="#B4513F" stroke-width="1.5" stroke-dasharray="3 6" opacity=".6"/><text x="${W}" y="${Y(20) - 8}" text-anchor="end" style="fill:#B4513F">reserva</text>
+    <line x1="${X(now)}" x2="${X(now)}" y1="0" y2="${H}" stroke="var(--line)" stroke-width="2"/>
+    <path d="${line}L${xs.at(-1)} ${H}L${xs[0]} ${H}Z" fill="url(#fg)"/><path d="${line}" fill="none" stroke="#C99236" stroke-width="3" stroke-linecap="round"/>
+    ${dd > .2 ? `<path d="M${X(now)} ${Y(lvl)}L${X(now + dd * 864e5)} ${Y(lvl - rate * dd)}" stroke="#C99236" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" opacity=".8"/>` : ''}
+    ${fills.map(e => `<circle cx="${X(e.t)}" cy="${Y(e.v)}" r="7" fill="#4E8A5F" stroke="var(--card)" stroke-width="3"/>`).join('')}
+    <circle cx="${X(now)}" cy="${Y(lvl)}" r="8" fill="#C99236" stroke="var(--card)" stroke-width="3"/>
+    ${lab(t0, 'hace 2 semanas', 'start')}${lab(t0 + 7 * 864e5, 'hace 1 semana')}${lab(now, 'hoy')}${lab(now + 7 * 864e5, 'próxima semana', 'end')}</svg>`;
+}
+// Mapa: teselas del IGN (mapa base oficial, gratis y sin clave; OSM bloquea a las apps y CARTO ya pide clave). En oscuro, invertidas.
+// Encuadra el coche y los últimos sitios donde aparcó: el zoom más cercano en que caben en ~440×320 de diseño.
+const tileXY = (la, lo, z) => { const n = 2 ** z, r = la * Math.PI / 180; return [(lo + 180) / 360 * n * 256, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n * 256]; };
+const whenShort = t => { const d = new Date(t), k = Math.round((sod(new Date()) - sod(d)) / 864e5); return (k === 0 ? 'hoy' : k === 1 ? 'ayer' : DOW[d.getDay()].toLowerCase()) + ' ' + hm(d); };
+function ignTiles(z, cx, cy) {
+  let t = '';
+  for (let tx = Math.floor(cx / 256) - 2; tx <= Math.floor(cx / 256) + 2; tx++) for (let ty = Math.floor(cy / 256) - 2; ty <= Math.floor(cy / 256) + 2; ty++)
+    t += `<img src="https://www.ign.es/wmts/ign-base?layer=IGNBaseTodo&style=default&tilematrixset=GoogleMapsCompatible&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/jpeg&TileMatrix=${z}&TileCol=${tx}&TileRow=${ty}" style="left:calc(50% + ${Math.round(tx * 256 - cx)}px);top:calc(50% + ${Math.round(ty * 256 - cy)}px)" alt="">`;
+  return t;
+}
+function carMap(la, lo, parks) {
+  const pts = [{ la, lo }, ...parks];
+  let z = 16;
+  for (; z > 10; z--) {
+    const xy = pts.map(p => tileXY(p.la, p.lo, z)), xs = xy.map(p => p[0]), ys = xy.map(p => p[1]);
+    if (Math.max(...xs) - Math.min(...xs) < 440 && Math.max(...ys) - Math.min(...ys) < 300) break;
+  }
+  const xy = pts.map(p => tileXY(p.la, p.lo, z)), cx = (Math.max(...xy.map(p => p[0])) + Math.min(...xy.map(p => p[0]))) / 2, cy = (Math.max(...xy.map(p => p[1])) + Math.min(...xy.map(p => p[1]))) / 2 + 40;
+  const t = ignTiles(z, cx, cy);
+  const at = (p, cls, html) => `<i class="${cls}" style="left:calc(50% + ${Math.round(p[0] - cx)}px);top:calc(50% + ${Math.round(p[1] - cy)}px)">${html}</i>`;
+  return t + xy.slice(1).map((p, k) => at(p, 'park' + (p[0] - cx > 90 ? ' l' : ''), `<b>${parks.length - k}</b><span>${whenShort(parks[k].t)}</span>`)).join('') + at(xy[0], 'pin', '')
+    + '<span class="osm">© Instituto Geográfico Nacional</span>';
+}
+// Órdenes al coche (cerrar/abrir, ventanillas): tardan ~1 min (van por los servidores de la marca). El botón queda «enviando» hasta que cambia lo que
+// tocaba o pasan 2 min. Abrir pide un segundo toque.
+const carPend = {};
+let carSure = 0;
+const carKey = k => k === 'lock' ? car('lock', 'door_lock')?.state : String(WINS.filter(on).length);
+const carWaiting = k => carPend[k] && Date.now() < carPend[k].until && carKey(k) === carPend[k].was;
+function carDo(k) {
+  const lk = car('lock', 'door_lock'), wins = WINS.filter(on).length;
+  let call;
+  if (k === 'lock' && lk.state === 'locked') {
+    if (Date.now() > carSure) { carSure = Date.now() + 5e3; renderCoche(); setTimeout(renderCoche, 5100); return; }
+    call = ['lock', 'unlock', lk.entity_id];
+  } else if (k === 'lock') call = ['lock', 'lock', lk.entity_id];
+  else call = ['button', 'press', carId('button', `${wins ? 'close' : 'vent'}_all_windows`)];
+  carSure = 0; carPend[k] = { until: Date.now() + 12e4, was: carKey(k) };
+  toast('Orden enviada. El coche tarda un minuto en hacerlo');
+  svc(call[0], call[1], { entity_id: call[2] }).then(() => setTimeout(() => loadHome().catch(() => {}), 45e3),
+    () => { delete carPend[k]; toast('El coche no ha recibido la orden. Prueba otra vez'); renderCoche(); });
+  renderCoche(); setTimeout(renderCoche, 12e4 + 500);
+}
+// Modo aparcacoches (valet): HA no da su estado, solo los dos botones
+function carValet(start) {
+  toast(start ? 'Activando el modo aparcacoches…' : 'Quitando el modo aparcacoches…');
+  svc('button', 'press', { entity_id: carId('button', `${start ? 'start' : 'stop'}_valet_mode`) }).catch(() => toast('El coche no ha recibido la orden. Prueba otra vez'));
+}
+// Luces que vigila el coche, por sitio: [x, y] en la escena (morro a la derecha; arriba = lado izquierdo del coche)
+const LAMPS = [
+  ['Faro izquierdo', 364, 74, ['headlamp_left_low_fault', 'headlamp_left_high_fault', 'headlamp_left_bifunctional_fault', 'headlight_fault']],
+  ['Faro derecho', 364, 146, ['headlamp_right_low_fault', 'headlamp_right_high_fault', 'headlamp_right_bifunctional_fault', 'headlight_fault']],
+  ['Intermitente delantero izquierdo', 344, 56, ['turn_signal_left_front_fault']], ['Intermitente delantero derecho', 344, 164, ['turn_signal_right_front_fault']],
+  ['Freno izquierdo', 52, 76, ['stop_lamp_left_fault']], ['Freno derecho', 52, 144, ['stop_lamp_right_fault']],
+  ['Intermitente trasero izquierdo', 60, 58, ['turn_signal_left_rear_fault']], ['Intermitente trasero derecho', 60, 162, ['turn_signal_right_rear_fault']],
+];
+// El coche desde arriba, grande, en su plaza. lamps = true: solo el contorno con las luces y ruedas en verde o rojo (tarjeta Salud)
+function carHero(st, lamps) {
+  const on = k => st(carId('binary_sensor', `${k}`))?.state === 'on';
+  const open = Object.fromEntries(CAR_PARTS.map(k => [k, on(k)]));
+  const lk = st(carId('lock', `door_lock`))?.state, locked = lk === 'locked', unknown = !['locked', 'unlocked'].includes(lk), driving = on('engine');
+  const R = 'var(--bad)', P = ' class="pulse"';
+  const tyre = k => on('tire_pressure_' + k) || on('tire_pressure_all');
+  const body = 'M94 50H316C350 50 370 66 372 92V128C370 154 350 170 316 170H94C66 170 50 160 48 140V80C50 60 66 50 94 50Z';
+  if (lamps) {
+    const dot = (x, y, bad) => `<circle cx="${x}" cy="${y}" r="${bad ? 9 : 7}" fill="${bad ? R : 'var(--ok)'}" stroke="var(--card)" stroke-width="3"${bad ? P : ''}/>`;
+    return `<svg class="lamps" viewBox="20 20 380 180" role="img" aria-label="Luces y ruedas">
+      <path d="${body}" fill="rgba(var(--wash),.5)" stroke="var(--line)" stroke-width="2.5"/>
+      <rect x="96" y="66" width="196" height="88" rx="16" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 6"/>
+      ${[['rear_left', 118, 46], ['front_left', 308, 46], ['rear_right', 118, 174], ['front_right', 308, 174]].map(([k, x, y]) =>
+        `<rect x="${x - 22}" y="${y - 7}" width="44" height="14" rx="6" fill="${tyre(k) ? R : 'var(--ok)'}" opacity="${tyre(k) ? 1 : .85}"${tyre(k) ? P : ''}/>`).join('')}
+      ${LAMPS.map(([, x, y, ks]) => dot(x, y, ks.some(on))).join('')}</svg>`;
+  }
+  const win = (k, x, w, y) => `<rect x="${x}" y="${y}" width="${w}" height="7" rx="3.5" fill="${k && open[k] ? R : 'var(--glass)'}"${k && open[k] ? P : ''}/>`;
+  const wheel = (x, y, k) => `<rect x="${x}" y="${y}" width="48" height="17" rx="7" fill="${tyre(k) ? R : 'var(--tyre)'}"${tyre(k) ? P : ''}/>`;
+  // delantera: bisagra delante, se abre en ángulo · corredera: sale y se desplaza hacia atrás
+  const front = (k, top) => open[k] ? `<path d="M300 ${top ? 52 : 168}L258 ${top ? 14 : 206}" stroke="${R}" stroke-width="7" stroke-linecap="round"${P}/>`
+    : `<path d="M246 ${top ? 50 : 170}v${top ? 12 : -12}M300 ${top ? 50 : 170}v${top ? 12 : -12}" stroke="var(--cbl)" stroke-width="2"/>`;
+  const slide = (k, top) => open[k] ? `<rect x="98" y="${top ? 34 : 178}" width="104" height="8" rx="4" fill="${R}"${P}/>`
+    : `<path d="M140 ${top ? 50 : 170}v${top ? 12 : -12}" stroke="var(--cbl)" stroke-width="2"/>`;
+  const fault = LAMPS.filter(([, , , ks]) => ks.some(on)).map(([, x, y]) => `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="${R}" stroke-width="3.5"${P}/>`).join('');
+  const lc = unknown ? 'var(--muted)' : driving ? 'var(--cool)' : locked ? 'var(--ok)' : R;
+  const hazard = on('luces_de_emergencia');
+  return `<svg class="car" viewBox="10 0 400 220" role="img" aria-label="Estado del coche">
+    <defs><linearGradient id="hcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--cb2)"/><stop offset=".22" style="stop-color:var(--cb1)"/><stop offset=".78" style="stop-color:var(--cb1)"/><stop offset="1" style="stop-color:var(--cb2)"/></linearGradient>
+      <linearGradient id="hrf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--roof1)"/><stop offset="1" style="stop-color:var(--roof2)"/></linearGradient>
+      <radialGradient id="hsh"><stop offset=".55" stop-color="#000" stop-opacity=".2"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <clipPath id="hcl"><path d="${body}"/></clipPath></defs>
+    ${driving ? `<path d="M14 92h44M24 110h30M14 128h44" stroke="var(--cool)" stroke-width="3" stroke-linecap="round" opacity=".5"/>`
+      : `<path d="M22 22H398M22 198H398" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="14 10"/>`}
+    <ellipse cx="212" cy="116" rx="190" ry="84" fill="url(#hsh)"/>
+    ${wheel(94, 41, 'rear_left')}${wheel(284, 41, 'front_left')}${wheel(94, 162, 'rear_right')}${wheel(284, 162, 'front_right')}
+    <path d="M292 50l6-9h8l-4 9zM292 170l6 9h8l-4-9z" fill="var(--cb2)" stroke="var(--cbl)" stroke-width="1.5"/>
+    <path d="${body}" fill="url(#hcb)" stroke="var(--cbl)" stroke-width="2.5"/>
+    <g clip-path="url(#hcl)">${open.hood ? `<rect x="324" y="40" width="60" height="140" fill="${R}" opacity=".85"${P}/>` : ''}${open.trunk ? `<rect x="38" y="40" width="30" height="140" fill="${R}" opacity=".85"${P}/>` : ''}</g>
+    <path d="M316 62C336 74 340 146 316 158L300 148C310 128 310 92 300 72Z" fill="var(--glass)"/>
+    <path d="M72 68C64 90 64 130 72 152L82 148C76 128 76 92 82 72Z" fill="var(--glass)"/>
+    <rect x="96" y="66" width="196" height="88" rx="16" fill="url(#hrf)"/>
+    <path d="M110 74H230L180 146H104Q100 146 100 140V82Q100 74 110 74Z" fill="#fff" opacity=".07"/>
+    ${win(null, 88, 44, 52)}${win('back_left_window', 144, 98, 52)}${win('front_left_window', 250, 46, 52)}
+    ${win(null, 88, 44, 161)}${win('back_right_window', 144, 98, 161)}${win('front_right_window', 250, 46, 161)}
+    ${front('front_left_door', true)}${front('front_right_door', false)}${slide('back_left_door', true)}${slide('back_right_door', false)}
+    <rect x="365" y="78" width="5" height="64" rx="2.5" fill="${hazard ? 'var(--warn)' : 'var(--bar)'}"${hazard ? P : ''}/>
+    <rect x="47" y="64" width="5" height="24" rx="2.5" fill="#C9473A" opacity=".8"/><rect x="47" y="132" width="5" height="24" rx="2.5" fill="#C9473A" opacity=".8"/>
+    ${fault}
+    <circle cx="194" cy="110" r="34" fill="${lc}" opacity=".2"/><circle cx="194" cy="110" r="23" fill="${lc}"/>
+    <rect x="185" y="107" width="18" height="13" rx="3" fill="#fff"/>
+    <path d="M188.5 107v-4.5a5.5 5.5 0 0 1 11 0${locked || unknown ? 'v4.5' : 'v-1.5'}" fill="none" stroke="#fff" stroke-width="2.6"/></svg>`;
+}
+function renderCoche() {
+  if (page !== 'coche') return;
+  const el = $('pg-coche'), st = id => casaSt[id], lk = car('lock', 'door_lock');
+  if (!Object.keys(casaSt).some(esCoche)) { el.innerHTML = '<div class="pgh"><h1>Coche</h1></div><div class="tile">Sin datos del coche todavía (revisa CONFIG.coche)</div>'; return; }
+  const hay = (dom, k) => !!car(dom, k);   // lo que la integración no da, no sale
+  const scroll = el.querySelector('.ccg')?.scrollTop || 0;   // el push repinta: que no salte arriba
+  const sv = k => car('sensor', k)?.state, ok = v => v != null && !['unknown', 'unavailable', 'None'].includes(v);
+  const locked = !lk || lk.state === 'locked', driving = on('engine'), upd = Date.parse(sv('last_updated_at')), polled = Date.parse(sv('ultima_exploracion'));
+  const loc = car('device_tracker', 'location'), home = loc?.state === 'home';
+  const addr = sv('geocoded_location'), street = ok(addr) ? addr.split(',').slice(0, 2).join(',') : '';
+  // ¿Está bien?
+  const parts = ['front_left_door', 'front_right_door', 'back_left_door', 'back_right_door', 'trunk', 'hood'].filter(on), wins = WINS.filter(on).length;
+  const tyres = on('tire_pressure_all') || TIRES.some(k => on('tire_pressure_' + k));
+  const lampsBad = LAMPS.filter(([, , , ks]) => ks.some(on));
+  const bat = +sv('car_battery_level');
+  // en rojo solo el nombre: qué rueda o qué luz lo marca el esquema de la misma tarjeta
+  const health = [['Neumáticos', !tyres, hay('binary_sensor', 'tire_pressure_all') || TIRES.some(k => hay('binary_sensor', 'tire_pressure_' + k))],
+    ['Luces', !lampsBad.length, LAMPS.some(([, , , ks]) => ks.some(k => hay('binary_sensor', k)))],
+    ['Líquido de frenos', !on('brake_fluid_warning'), hay('binary_sensor', 'brake_fluid_warning')], ['Limpiaparabrisas', !on('washer_fluid_warning'), hay('binary_sensor', 'washer_fluid_warning')],
+    ['Pila de la llave', !on('smart_key_battery_warning'), hay('binary_sensor', 'smart_key_battery_warning')],
+    ['Batería 12 V', !(bat < 60) && !on('aviso_previo_de_desconexion_automatica_de_la_bateria'), hay('sensor', 'car_battery_level')]].filter(h => h[2]);
+  const warns = health.filter(h => !h[1]);
+  const bad = !locked || parts.length || wins || warns.length;
+  const [hl, hc, hsub] = driving ? ['En marcha', '--cool', 'Alguien lo está conduciendo']
+    : !bad ? ['Todo en orden', '--ok', home ? 'Cerrado y aparcado en casa' : `Cerrado${street ? ' en ' + esc(street) : ''}`]
+    : !locked && !parts.length && !wins && !warns.length ? ['Sin cerrar', '--bad', 'Todo lo demás está bien'] : ['Revisa el coche', '--bad', 'Hay algo que mirar'];
+  const chk = (good, txt) => `<div class="chk${good ? '' : ' bad'}">${ic(good ? 'check' : 'alert')}${txt}</div>`;
+  const chip = (icon, txt, isBad) => `<span class="hchip${isBad ? ' bad' : ''}">${ic(icon)}${txt}</span>`;
+  const contacto = driving ? 'Motor en marcha' : on('accesorios') ? 'Contacto en accesorios' : 'Apagado';
+  const hero = `<div class="tile tt hero" style="--tint:var(--t-${hc.slice(2)});--tc:var(${hc})"><div class="carv"${COCHE.modelo3d ? ' onclick="open3D()"' : ''}>${carHero(st)}${COCHE.modelo3d ? `<span class="v3">${ic('cube')}Ver en 3D</span>` : ''}</div>
+    <div class="hs"><div class="hl"><i class="dot" style="--dc:var(${hc})"></i>${hl}</div><div class="hsub">${hsub}</div>
+      <div class="hchips">${lk ? chip(locked ? 'lock' : 'unlock', locked ? 'Cerrado con llave' : 'Sin cerrar', !locked) : ''}
+        ${chip('door', parts.length ? parts.length + (parts.length > 1 ? ' abiertas' : ' abierta') : 'Puertas cerradas', parts.length)}
+        ${chip('window', wins ? wins + (wins > 1 ? ' ventanillas bajadas' : ' ventanilla bajada') : 'Ventanillas subidas', wins)}
+        ${chip('power', contacto)}${on('air_conditioner') ? chip('fan', 'Aire puesto') : ''}
+        ${loc ? chip('pin', home ? 'En casa' : esc(street || 'Fuera')) : ''}</div>
+      ${ok(addr) ? `<div class="haddr">${ic('pin')}<span>${esc(addr.split(',').slice(0, 4).join(','))}</span></div>` : ''}</div></div>`;
+  // Acciones: dicen lo que harán y cómo está ahora
+  const btn = (k, icon, title, sub, main) => `<button class="act${main ? ' main' : ''}${carWaiting(k) ? ' sent' : ''}" onclick="carDo('${k}')"${driving ? ' disabled' : ''}>
+    <span class="ai">${ic(icon)}</span><span><b>${carWaiting(k) ? 'Enviado al coche…' : title}</b><small>${carWaiting(k) ? 'Tarda alrededor de un minuto' : sub}</small></span></button>`;
+  const acts = `<div class="tile"><div class="ct">${ic('car')}Acciones</div><div class="acts">
+    ${!lk ? '' : locked ? (Date.now() < carSure ? btn('lock', 'unlock', 'Toca otra vez para abrir', 'Se abrirá el coche', true) : btn('lock', 'unlock', 'Abrir el coche', 'Está cerrado. Pedirá confirmación', false))
+      : btn('lock', 'lock', 'Cerrar el coche', 'Ahora está sin cerrar', true)}
+    ${!hay('button', 'close_all_windows') ? '' : wins ? btn('win', 'window', 'Cerrar ventanillas', wins > 1 ? wins + ' están abiertas' : 'Hay una abierta', true)
+      : hay('button', 'vent_all_windows') ? btn('win', 'wind', 'Ventilar el coche', 'Baja un poco las cuatro ventanillas', false) : ''}
+    ${!hay('button', 'start_valet_mode') ? '' : `<div class="act valet"><span class="ai">${ic('key')}</span><span><b>Modo aparcacoches</b><small>Al dejárselo a otro: oculta tus datos</small></span>
+      <span class="vb"><button class="btn" onclick="carValet(true)"${driving ? ' disabled' : ''}>Activar</button><button class="btn" onclick="carValet(false)"${driving ? ' disabled' : ''}>Quitar</button></span></div>`}
+    ${driving ? '<div class="note">Con el coche en marcha no se le pueden mandar órdenes</div>' : ''}</div></div>`;
+  // Cifras
+  const lvl = +sv('fuel_level'), range = autonomia(id => casaSt[id]) ?? NaN, odoNow = +sv('odometer');
+  const fc = lvl > 50 ? 'var(--ok)' : lvl > 20 ? 'var(--warn)' : 'var(--bad)', bc = bat > 75 ? 'var(--ok)' : bat >= 60 ? 'var(--warn)' : 'var(--bad)';
+  const odo = cocheHist?.[carId('sensor', `odometer`)], span = odo?.length > 1 ? (Date.now() - odo[0].t) / 864e5 : 0;
+  const kmDay = span >= 2 ? (odo.at(-1).v - odo[0].v) / span : NaN, rate = kmDay > 0 && range > 20 ? kmDay * lvl / range : NaN;
+  const wk = odo?.find(e => e.t >= Date.now() - 7 * 864e5), kmWeek = wk && !isNaN(odoNow) ? odoNow - wk.v : NaN;
+  const ring = (p, c) => `<svg class="ring" viewBox="0 0 76 76"><circle class="rt" cx="38" cy="38" r="31"/>${isNaN(p) ? '' : `<circle cx="38" cy="38" r="31" stroke="${c}" stroke-dasharray="${Math.max(0, Math.min(100, p)) * 1.948} 200" transform="rotate(-90 38 38)"/>`}
+    <text x="38" y="44" text-anchor="middle">${isNaN(p) ? '—' : Math.round(p) + '%'}</text></svg>`;
+  const kpi = (lead, label, value, sub) => `<div class="kpi">${lead}<div style="min-width:0"><div class="kl">${label}</div><div class="kv">${value}</div><div class="ks">${sub}</div></div></div>`;
+  const kpis = `<div class="tile kpis">${kpi(ring(lvl, fc), 'Gasolina', isNaN(range) ? '—' : `${kmFmt(range)} <small>km</small>`, lvl <= 20 ? 'En reserva' : 'de autonomía')}
+    ${kpi(`<div class="ki">${ic('gauge')}</div>`, 'Cuentakilómetros', isNaN(odoNow) ? '—' : `${kmFmt(odoNow)} <small>km</small>`,
+      isNaN(kmWeek) ? '&nbsp;' : `${kmFmt(kmWeek)} km en los últimos 7 días`)}
+    ${kpi(ring(bat, bc), 'Batería 12 V', isNaN(bat) ? '—' : bat >= 60 ? 'Bien' : 'Baja', 'arranque y cierre')}
+    ${kpi(`<div class="ki">${ic('clock')}</div>`, 'Último dato del coche', upd ? ago(upd) : '—', polled ? 'Comprobado ' + ago(polled) : '&nbsp;')}</div>`;
+  // Salud: luces y ruedas en su sitio, avisos y clima
+  const climOn = k => on(k) ? ' class="on"' : '';
+  const salud = `<div class="tile tt" style="--tint:var(--t-${warns.length ? 'bad' : 'ok'});--tc:var(--${warns.length ? 'bad' : 'ok'})"><div class="ct">${ic('shield')}Salud
+      <em><i class="dot" style="--dc:var(--${warns.length ? 'bad' : 'ok'})"></i>${warns.length ? (warns.length > 1 ? warns.length + ' avisos' : 'Un aviso') : 'Todo bien'}</em></div>
+    ${carHero(st, true)}
+    <div class="hlist">${health.map(([n, good]) => chk(good, n)).join('')}</div>
+    <div class="clim"><span${climOn('air_conditioner')}><i class="dot" style="--dc:var(--${on('air_conditioner') ? 'cool' : 'muted'})"></i>Aire</span>
+      <span${climOn('defrost')}><i class="dot" style="--dc:var(--${on('defrost') ? 'cool' : 'muted'})"></i>Desempañado</span>
+      <span${climOn('back_window_heater')}><i class="dot" style="--dc:var(--${on('back_window_heater') ? 'cool' : 'muted'})"></i>Luneta</span></div></div>`;
+  // Puertas: abierta o cerrada, con llave o sin ella, y su ventanilla
+  const DOORS = [['front_left', 'delantera_izquierda', 'Conductor'], ['front_right', 'delantera_derecha', 'Copiloto'],
+    ['back_left', 'trasera_izquierda', 'Corredera izquierda'], ['back_right', 'trasera_derecha', 'Corredera derecha']];
+  const cell = (name, isBad, txt) => `<div class="door${isBad ? ' bad' : ''}"><b><i class="dot" style="--dc:var(--${isBad ? 'bad' : 'ok'})"></i>${name}</b><small>${txt}</small></div>`;
+  const doors = `<div class="tile"><div class="ct">${ic('door')}Puertas y ventanillas<em>${parts.length || wins ? 'Algo abierto' : 'Todo cerrado'}</em></div><div class="doors">
+    ${DOORS.filter(([k]) => hay('binary_sensor', k + '_door')).map(([k, c, n]) => {
+      const o = on(k + '_door'), u = on('cierre_puerta_' + c), w = on(k + '_window');
+      return cell(n, o || u || w, [o ? 'Abierta' : 'Cerrada', u ? 'sin llave' : 'con llave', w ? 'ventanilla bajada' : 'ventanilla subida'].join(' · '));
+    }).join('')}
+    ${cell('Capó', on('hood'), on('hood') ? 'Abierto' : 'Cerrado')}${cell('Maletero', on('trunk'), on('trunk') ? 'Abierto' : 'Cerrado')}</div></div>`;
+  // Gasolina: para cuándo da y dónde repostar (la cifra está arriba)
+  const toRes = (lvl - 20) / rate, resDay = addDays(new Date(), Math.floor(toRes));
+  const note = isNaN(lvl) ? '' : lvl <= 20 ? '<b>Estás en la reserva.</b> Conviene repostar hoy'
+    : isNaN(rate) ? '' : toRes < 1 ? `Al ritmo de estos días <b>llegas a la reserva mañana</b>`
+    : toRes < 7 ? `Al ritmo de estos días <b>llegas a la reserva el ${DOW_LONG[resDay.getDay()]}</b>`
+    : `Al ritmo de estos días <b>tienes para más de una semana</b>`;
+  const best = favStations()[0], litres = isNaN(lvl) ? 0 : (100 - lvl) / 100 * TANK_L;
+  const fuel = `<div class="tile tt fuelc" style="--tint:var(--t-warm);--tc:var(--warn)"><div class="fl"><div class="ct">${ic('fuel')}Gasolina<em>${isNaN(lvl) ? '' : Math.round(lvl) + ' %'}</em></div>
+      <div class="fbar2"><i style="width:${isNaN(lvl) ? 0 : Math.min(100, lvl)}%;background:${fc}"></i></div>
+      <div class="fnote">${note}</div></div>
+    <div class="fr">${fuelTrend(cocheHist?.[carId('sensor', `fuel_level`)], lvl, rate)}</div>
+    ${best && litres > 5 ? `<div class="gasb"><div class="logo">${gasLogo(best.name)}</div><div class="gi">${esc(best.label)}<small>Llenar ≈ ${Math.round(litres * best.p)} €</small></div><b>${coma(best.p, 3)} €</b></div>` : ''}</div>`;
+  const fuelArgs = [cocheHist?.[carId('sensor', `fuel_level`)], lvl, rate];
+  // Dónde está y dónde ha aparcado
+  const la = loc?.attributes.latitude, lo = loc?.attributes.longitude, locT = Date.parse(sv('location_last_updated')) || upd;
+  const parks = (cocheHist?.parks || []).filter(p => la == null || km(p.la, p.lo, la, lo) >= .15).slice(-4);
+  const map = `<div class="tile mapc pmap">${la != null ? `<div class="map">${carMap(la, lo, parks)}</div>` : ''}${parks.length ? '<div class="mtag">Últimos sitios donde aparcó</div>' : ''}
+    <div class="mlab">${ic('pin')}<div>${home ? 'En casa' : esc(street || 'Ubicación desconocida')}<small>${driving ? 'En marcha' : 'Aparcado ' + ago(locT)}</small></div></div></div>`;
+  const vin = sv('vehicle_identification_number');
+  const ficha = `<div class="ficha"><span><b>${esc(COCHE.nombre || 'Coche')}</b></span>${ok(vin) ? `<span>Bastidor ${esc(vin)}</span>` : ''}</div>`;
+  el.innerHTML = `<div class="pgh"><h1>Coche</h1><div class="pgs">${upd ? 'Datos de ' + ago(upd) : 'Sin datos recientes'}</div>
+      ${hay('button', 'force_refresh') ? `<button class="btn f${carWaiting('upd') ? ' busy' : ''}" style="--fb:var(--t-sky);--fc:var(--cool)" onclick="carPend.upd={until:Date.now()+6e4,was:carKey('upd')};act(this,'button','press',{entity_id:'${carId('button', 'force_refresh')}'});toast('Pidiendo datos al coche…')">${ic('refresh')}Actualizar</button>` : ''}</div>
+    <div class="ccg">${hero}${acts}${kpis}${salud}${doors}${fuel}${FAV_STATIONS.length ? `<div class="tile mapc gmap" id="gmap">${gasMapHtml}</div>` : ''}${loc ? map : ''}${ficha}</div>`;
+  el.querySelector('.ccg').scrollTop = scroll;
+  // el gráfico se redibuja con el alto que le queda para ocupar todo el ancho sin tapar nada
+  const fr = el.querySelector('.fuelc .fr');
+  if (fr && fr.clientHeight) fr.innerHTML = fuelTrend(...fuelArgs, Math.max(80, Math.round(560 * fr.clientHeight / fr.clientWidth) - 28));
+  paintGasMap().catch(() => {});
 }
 
 // Carrusel Hogar ⇄ Avión ⇄ Vuelo seguido: los puntos siguen al deslizamiento y llevan a cada tarjeta
@@ -2274,15 +2876,25 @@ const favStations = () => FAV_STATIONS.map(([name, ids]) => {
 const LOGOS = ['alcampo', 'ballenoil', 'bp', 'cepsa', 'eni', 'galp', 'moeve', 'petroprix', 'repsol', 'shell'];
 const gasLogo = n => { const k = n.trim().split(/\s+/)[0].toLowerCase(); return LOGOS.includes(k) ? `<img src="logos/${k}.png" alt="">` : esc(n.trim()[0] || '?'); };
 async function loadEnergy() {
-  if (Date.now() - stationsAt > 60 * 6e4 && !(Date.now() - loadStations.at < 10 * 6e4)) {   // si falla, otra vez a los 10 min
+  if (FAV_STATIONS.length && Date.now() - stationsAt > 60 * 6e4 && !(Date.now() - loadStations.at < 10 * 6e4)) {   // si falla, otra vez a los 10 min
     loadStations.at = Date.now();
     await loadStations().catch(e => { if (!stations) throw e; });
+  }
+  // El coche (si lo hay): su dibujo, el depósito y la autonomía
+  let gauge = '';
+  if (COCHE) {
+    const all = await allStates(), st = id => all.find(x => x.entity_id === id);
+    const fuel = st(carId('sensor', 'fuel_level')), range = autonomia(st), lvl = fuel ? Number(fuel.state) : NaN;
+    const color = lvl > 50 ? '#3BA55C' : lvl > 20 ? '#F5A623' : '#D9483B';   // mismos cortes que la página Coche
+    gauge = `<div class="gauge">${carView(st)}
+      ${isNaN(lvl) ? '' : `<div class="fbar"><i style="width:${Math.min(100, Math.max(0, lvl))}%;background:${color}"></i></div>
+      <div class="sub2"><b style="color:${color}">${Math.round(lvl)} %</b> · ${range != null ? Math.round(range) + ' km' : '—'}</div>`}</div>`;
   }
   // Solo las gasolineras favoritas, de la más barata a la más cara (con varios IDEESS, la más barata de ellas)
   const list = favStations();
   const cheap = list[0], near = list.reduce((a, b) => (!a || b.d < a.d ? b : a), null);
   const ps = list.map(e => e.p), min = Math.min(...ps), max = Math.max(...ps);
-  $('energy').innerHTML = `<div class="th">⛽<span style="color:var(--warm)">GASOLINA 95</span></div><div class="in">
+  $('energy').innerHTML = `<div class="th">⛽<span style="color:var(--warm)">${FAV_STATIONS.length ? 'GASOLINA 95' : ''}${FAV_STATIONS.length && COCHE ? ' Y ' : ''}${COCHE ? esc((COCHE.nombre || 'Coche').toUpperCase()) : ''}</span></div><div class="in">${gauge}
     <div class="gas">${list.map((e, i) => {
       const c = priceColor(e.p, min, max);
       const tag = e === cheap && list.length > 1 ? '<span class="tag" style="background:#3BA55C">MÁS BARATA</span>'
@@ -2292,6 +2904,103 @@ async function loadEnergy() {
         <div class="sinfo"><div class="sname">${esc(name)}</div><div class="sa">${tag}${coma(e.d)} km · ${esc(e.addr)}</div></div>
         <div class="sprice" style="color:${c}">${coma(e.p, 3)}<small>€/l</small></div></div>`;
     }).join('')}</div></div>`;
+}
+
+// Mapa de las 4 gasolineras favoritas: precio y minutos desde casa con el tráfico de ahora (Waze, por HA, cada 10 min)
+let gasMapKey = '', gasMapHtml = '', favMin = {}, favMinAt = 0;
+async function loadFavMin() {
+  if (Date.now() - favMinAt < 10 * 6e4) return;
+  favMinAt = Date.now();
+  const r = await Promise.all(favStations().map(e => waze('zone.home', `${e.la},${e.lo}`).then(x => [e.id, x.duration], () => [e.id, favMin[e.id]])));
+  favMin = Object.fromEntries(r);
+}
+async function paintGasMap() {
+  if (!stations) return;
+  await loadFavMin().catch(() => {});
+  const el = $('gmap'), list = favStations();
+  if (!el || !list.length) return;
+  const W = el.clientWidth || 420, H = el.clientHeight || 300, key = [W, H, stationsAt, favMinAt, JSON.stringify(favMin)].join();
+  if (key === gasMapKey) { if (!el.firstChild) el.innerHTML = gasMapHtml; return; }
+  gasMapKey = key;
+  // el zoom más cercano en que caben casa y las 4, con sitio para las etiquetas encima de cada punto
+  const pts = [{ la: cfg.latitude, lo: cfg.longitude }, ...list];
+  let z = 16, xy;
+  for (; z > 8; z--) {
+    xy = pts.map(p => tileXY(p.la, p.lo, z));
+    const xs = xy.map(p => p[0]), ys = xy.map(p => p[1]);
+    if (Math.max(...xs) - Math.min(...xs) < W - 200 && Math.max(...ys) - Math.min(...ys) < H - 160) break;
+  }
+  const xs = xy.map(p => p[0]), ys = xy.map(p => p[1]);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2 - 25;
+  const ps = list.map(e => e.p), min = Math.min(...ps), max = Math.max(...ps);
+  const pos = p => `left:calc(50% + ${Math.round(p[0] - cx)}px);top:calc(50% + ${Math.round(p[1] - cy)}px)`;
+  // etiqueta encima del punto; si pisa otra (o la casa), debajo, a la derecha o a la izquierda. Medidas aproximadas: 140 × 48
+  const placed = [[xy[0][0] - 16, xy[0][1] - 16, xy[0][0] + 16, xy[0][1] + 16]], LW = 140, LH = 48;
+  const spots = { up: (x, y) => [x - LW / 2, y - 12 - LH], dn: (x, y) => [x - LW / 2, y + 12], r: (x, y) => [x + 12, y - LH / 2], l: (x, y) => [x - 12 - LW, y - LH / 2] };
+  const hit = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  const side = list.map((e, i) => {
+    const [x, y] = xy[i + 1];
+    const k = Object.keys(spots).find(k => { const [l, t] = spots[k](x, y), r = [l, t, l + LW, t + LH]; return !placed.some(q => hit(q, r)); }) || 'up';
+    const [l, t] = spots[k](x, y); placed.push([l, t, l + LW, t + LH]);
+    return k;
+  });
+  const marks = list.map((e, i) => {
+    const c = priceColor(e.p, min, max), m = favMin[e.id];
+    return `<i class="gdot" style="${pos(xy[i + 1])};background:${c}"></i><i class="gfav ${side[i]}" style="${pos(xy[i + 1])};--pc:${c}">
+      <b>${esc(e.label)}</b><span>${coma(e.p, 3)} €${m != null ? ` · ${Math.round(m)} min` : ''}</span></i>`;
+  }).join('');
+  el.innerHTML = gasMapHtml = `<div class="map">${ignTiles(z, cx, cy)}<i class="pin" style="${pos(xy[0])}"></i>${marks}<span class="osm">© IGN · Waze</span></div>
+    <div class="mtag">Tus gasolineras · minutos con el tráfico de ahora</div>`;
+}
+
+// --- Estado del coche (integración del coche, CONFIG.coche): vista desde arriba, el morro a la derecha ---
+// Puertas, ventanillas, capó y maletero abiertos en rojo; candado verde (cerrado) o rojo (abierto) en el techo.
+// Las puertas traseras de el coche son correderas: abiertas se dibujan desplazadas hacia atrás.
+const CAR_PARTS = ['front_left_door', 'front_right_door', 'back_left_door', 'back_right_door', 'front_left_window',
+  'front_right_window', 'back_left_window', 'back_right_window', 'hood', 'trunk'];
+// El coche solo avisa de presión baja por rueda (no manda los bares): la rueda avisada se pinta en rojo
+const TIRES = ['front_left', 'front_right', 'rear_left', 'rear_right'];
+const CAR_IDS = [carId('lock', `door_lock`), carId('binary_sensor', `engine`), carId('binary_sensor', `tire_pressure_all`),
+  ...CAR_PARTS.map(k => carId('binary_sensor', `${k}`)), ...TIRES.map(k => carId('binary_sensor', `tire_pressure_${k}`))];
+const PART_NAME = { front_left_door: 'Puerta del conductor', front_right_door: 'Puerta del copiloto',
+  back_left_door: 'Corredera izquierda', back_right_door: 'Corredera derecha', hood: 'Capó', trunk: 'Maletero' };
+function carView(st) {
+  const open = Object.fromEntries(CAR_PARTS.map(k => [k, st(carId('binary_sensor', `${k}`))?.state === 'on']));
+  const lk = st(carId('lock', `door_lock`))?.state, locked = lk === 'locked', unknown = !['locked', 'unlocked'].includes(lk);
+  const R = '#D9483B', G = '#3BA55C', GLASS = '#BFD9EA', LINE = '#CDBFAE';
+  const low = Object.fromEntries(TIRES.map(k => [k, st(carId('binary_sensor', `tire_pressure_${k}`))?.state === 'on']));
+  const lowAny = Object.values(low).some(Boolean) || st(carId('binary_sensor', `tire_pressure_all`))?.state === 'on';
+  const tire = k => low[k] ? R : '#4A4038';
+  const win = (k, x, w, y) => `<rect x="${x}" y="${y}" width="${w}" height="5" rx="2.5" fill="${open[k] ? R : GLASS}"/>`;
+  // puerta delantera: bisagra delante, se abre en ángulo · corredera: sale hacia fuera y hacia atrás
+  const front = (k, top) => open[k]
+    ? `<path d="M138 ${top ? 20 : 80} L114 ${top ? 4 : 96}" stroke="${R}" stroke-width="5" stroke-linecap="round"/>`
+    : `<path d="M108 ${top ? 20 : 80}v${top ? 8 : -8}M138 ${top ? 20 : 80}v${top ? 8 : -8}" stroke="${LINE}" stroke-width="1.5"/>`;
+  const slide = (k, top) => open[k]
+    ? `<rect x="40" y="${top ? 9 : 85}" width="44" height="6" rx="3" fill="${R}"/>`
+    : `<path d="M58 ${top ? 20 : 80}v${top ? 8 : -8}M104 ${top ? 20 : 80}v${top ? 8 : -8}" stroke="${LINE}" stroke-width="1.5"/>`;
+  const svg = `<svg class="car" viewBox="0 0 200 100" role="img" aria-label="Estado del coche">
+    <rect x="40" y="14" width="16" height="7" rx="3" fill="${tire('rear_left')}"/><rect x="140" y="14" width="16" height="7" rx="3" fill="${tire('front_left')}"/>
+    <rect x="40" y="79" width="16" height="7" rx="3" fill="${tire('rear_right')}"/><rect x="140" y="79" width="16" height="7" rx="3" fill="${tire('front_right')}"/>
+    <rect x="16" y="20" width="168" height="60" rx="18" fill="#fff" stroke="${LINE}" stroke-width="2.5"/>
+    ${open.trunk ? `<path d="M34 22 H30 Q18 22 18 36 V64 Q18 78 30 78 H34Z" fill="${R}"/>` : ''}
+    ${open.hood ? `<path d="M154 22 H166 Q182 22 182 38 V62 Q182 78 166 78 H154Z" fill="${R}"/>` : ''}
+    <path d="M150 27 Q159 50 150 73 L139 69 Q145 50 139 31Z" fill="${GLASS}"/>
+    <path d="M30 31 Q26 50 30 69 L37 67 Q34 50 37 33Z" fill="${GLASS}"/>
+    <rect x="42" y="31" width="94" height="38" rx="9" fill="#F3EAE0"/>
+    ${win('back_left_window', 60, 42, 23)}${win('front_left_window', 110, 26, 23)}
+    ${win('back_right_window', 60, 42, 72)}${win('front_right_window', 110, 26, 72)}
+    ${front('front_left_door', true)}${front('front_right_door', false)}${slide('back_left_door', true)}${slide('back_right_door', false)}
+    <circle cx="89" cy="50" r="14" fill="${unknown ? '#A6998A' : locked ? G : R}"/>
+    <rect x="82.5" y="48" width="13" height="10" rx="2" fill="#fff"/>
+    <path d="M85 48 v-3.5 a4 4 0 0 1 8 0 ${locked || unknown ? 'v3.5' : 'v-1'}" fill="none" stroke="#fff" stroke-width="2.2"/></svg>`;
+  const doors = CAR_PARTS.filter(k => open[k] && !k.endsWith('window'));
+  const wins = CAR_PARTS.filter(k => open[k] && k.endsWith('window')).length;
+  const issues = [...(lowAny ? ['Presión baja'] : []), ...doors.map(k => PART_NAME[k]), ...(wins ? [wins === 1 ? 'Ventanilla abierta' : wins + ' ventanillas abiertas'] : [])];
+  // en marcha manda el motor: «abierto/cerrado» no dice nada mientras alguien conduce (la presión baja sí se dice)
+  if (st(carId('binary_sensor', `engine`))?.state === 'on') return `${svg}<div class="cst" style="color:#2F80ED">Motor arrancado${lowAny ? ` · <span style="color:${R}">Presión baja</span>` : ''}</div>`;
+  const text = issues.length ? issues.join(' · ') : unknown ? 'Sin datos' : locked ? 'Cerrado' : 'Sin cerrar';
+  return `${svg}<div class="cst" style="color:${issues.length || (!locked && !unknown) ? R : unknown ? 'var(--muted)' : G}">${esc(text)}</div>`;
 }
 
 // --- Real Madrid y la selección española: último partido (o el que se está jugando) y los 3 siguientes de los dos, juntos,
@@ -2634,7 +3343,7 @@ function renderOra() {
   eswap.show(eswap.i);
 }
 // Gasolina y coche ⇄ Oración, cada 7 s a destiempo de cuentas atrás/Madrid; solo con la liturgia de hoy
-const eswap = hueco($('eswap'), $('edots'), () => { const t = [...(FAV_STATIONS.length ? [$('energy')] : []), ...(litHoy() ? [$('ora')] : [])]; return t.length ? t : [$('energy')]; });
+const eswap = hueco($('eswap'), $('edots'), () => { const t = [...(FAV_STATIONS.length || CONFIG.coche ? [$('energy')] : []), ...(litHoy() ? [$('ora')] : [])]; return t.length ? t : [$('energy')]; });
 eswap.reset = turno(() => eswap.show(eswap.i + 1), 7000, 10500);    // a destiempo de cuentas atrás/Madrid
 
 // Waze ⇄ Lo próximo (una por calendario) ⇄ Tareas, cada 6 s; con la cuenta atrás del cole, quieto en ella
@@ -2718,7 +3427,7 @@ async function connectPush() {
       if (!first && Object.keys({ ...m.event.a, ...m.event.c }).every(id => [PLANE, FOLLOW, PREV].includes(id))) { loadPlane().catch(() => {}); return; }
       first = false;                                                   // el primero (estado inicial) también: pone al día
       clearTimeout(wsTimer);
-      wsTimer = setTimeout(() => loadHome().catch(() => {}), 800);  // agrupa ráfagas
+      wsTimer = setTimeout(() => { loadHome().catch(() => {}); if (FAV_STATIONS.length || CONFIG.coche) loadEnergy().catch(() => {}); }, 800);  // agrupa ráfagas
     }
   };
   let n = 1;
@@ -2747,7 +3456,7 @@ async function refresh() {
   const st = $('status');
   try {
     cfg = cfg || await ha('config');
-    const jobs = [loadEvents(), loadHome(), loadCountdowns(), ...(CONFIG.aviones ? [loadPlane()] : []), ...(FAV_STATIONS.length ? [loadEnergy()] : []),
+    const jobs = [loadEvents(), loadHome(), loadCountdowns(), ...(CONFIG.aviones ? [loadPlane()] : []), ...(FAV_STATIONS.length || CONFIG.coche ? [loadEnergy()] : []),
       ...(TEAMS.length ? [loadMatches()] : []), ...(CONFIG.oracion ? [loadLit()] : [])];
     if (Date.now() - forecastAt > 30 * 6e4) jobs.push(loadWeather());
     const bad = (await Promise.allSettled(jobs)).filter(r => r.status === 'rejected');
@@ -2762,10 +3471,12 @@ async function refresh() {
 
 // Lo que no está en CONFIG, fuera
 $('kids').hidden = !CONFIG.talentos;
-$('eswap').parentNode.hidden = !FAV_STATIONS.length && !CONFIG.oracion;
+$('eswap').parentNode.hidden = !FAV_STATIONS.length && !CONFIG.coche && !CONFIG.oracion;
 $('swap').parentNode.hidden = !TEAMS.length;
 document.querySelector('#rail [data-p=oracion]').hidden = !CONFIG.oracion;
 document.querySelector('#rail [data-p=tareas]').hidden = !CONFIG.tareas;
+document.querySelector('#rail [data-p=compra]').hidden = !CONFIG.mercadona;
+document.querySelector('#rail [data-p=coche]').hidden = !CONFIG.coche;
 tick(); swap.show(0);
 setInterval(() => {
   tick();

@@ -1,0 +1,4 @@
+# Marco · carrito de Mercadona (página «Compra»). data = base64 de {"cmd": ...}: nada que escapar.
+# El script solo lee y cambia el carrito; no hay órdenes de pedir ni de pagar. Sesión en /config/.mercadona (600).
+shell_command:
+  marco_mercadona: "python3 /config/marco/mercadona.py {{ data }}"
